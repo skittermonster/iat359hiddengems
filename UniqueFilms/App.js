@@ -1,9 +1,14 @@
 // App.js
+import * as Font from 'expo-font';
+import { useFonts } from 'expo-font';
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import AuthStack from './AuthStack';
 import MainTabNavigator from './MainTabNavigator';
 import OnboardingScreen from './OnboardingScreen';
+import FirstPage from './FirstPage';
+import LoginScreen from './LoginScreen';
+import SignupScreen from './SignupScreen';
 import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -16,6 +21,11 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isOnboarded, setIsOnboarded] = useState(null);
   const [initializing, setInitializing] = useState(true);
+
+  const [fontsLoaded] = useFonts({
+    Righteous: require('./assets/Righteous-Regular.ttf'),
+    Lato_Black: require('./assets/Lato-Black.ttf')
+  });
 
   useEffect(() => {
     // Main auth state listener
@@ -71,21 +81,41 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      {!user ? (
-        // Not logged in - show auth stack
-        <AuthStack />
-      ) : !isOnboarded ? (
-        // Logged in but not onboarded - show onboarding
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Onboarding">
-            {props => <OnboardingScreen {...props} userId={user.uid} />}
-          </Stack.Screen>
-        </Stack.Navigator>
-      ) : (
-        // Logged in and onboarded - show main app
-        <MainTabNavigator />
-      )}
-    </NavigationContainer>
-  );
+  <NavigationContainer>
+    {!user ? (
+      <Stack.Navigator initialRouteName="FirstPage" screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="FirstPage" component={FirstPage} />
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Signup" component={SignupScreen} />
+      </Stack.Navigator>
+    ) : !isOnboarded ? (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Onboarding">
+          {props => <OnboardingScreen {...props} userId={user.uid} />}
+        </Stack.Screen>
+      </Stack.Navigator>
+    ) : (
+      <MainTabNavigator />
+    )}
+  </NavigationContainer>
+);
+
+  // return (
+  //   <NavigationContainer>
+  //     {!user ? (
+  //       // Not logged in - show auth stack
+  //       <AuthStack />
+  //     ) : !isOnboarded ? (
+  //       // Logged in but not onboarded - show onboarding
+  //       <Stack.Navigator screenOptions={{ headerShown: false }}>
+  //         <Stack.Screen name="Onboarding">
+  //           {props => <OnboardingScreen {...props} userId={user.uid} />}
+  //         </Stack.Screen>
+  //       </Stack.Navigator>
+  //     ) : (
+  //       // Logged in and onboarded - show main app
+  //       <MainTabNavigator />
+  //     )}
+  //   </NavigationContainer>
+  // );
 }
