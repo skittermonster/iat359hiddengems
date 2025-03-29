@@ -35,47 +35,50 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.logoGlow}>GEM</Text>
         <Text style={styles.logo}>GEM</Text>
       </View>
-
+  
       {/* Tagline */}
       <Text style={styles.tagline}>Discover Hidden Cinematic Treasures</Text>
-
-      {/* Section Title */}
-      <Text style={styles.sectionTitle}>Log In</Text>
-
-      {/* Email Input */}
-      <TextInput
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        placeholderTextColor="#888"
-        style={styles.input}
-      />
-
-      {/* Password Input */}
-      <TextInput
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        placeholderTextColor="#888"
-        style={styles.input}
-      />
-
-      {/* Forgot Password */}
-      <Text style={styles.forgotText}>Forgot Password?</Text>
-
-      {/* Error Text */}
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-      {/* Submit Button */}
-      <TouchableOpacity
-        style={styles.loginButton}
-        onPress={onLogin}
-        disabled={loading}
-      >
-        <Text style={styles.loginButtonText}>Log In</Text>
-      </TouchableOpacity>
+  
+      {/* Form content shifted upward */}
+      <View style={styles.formWrapper}>
+        {/* Section Title */}
+        <Text style={styles.sectionTitle}>Log In</Text>
+  
+        {/* Email Input */}
+        <TextInput
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          placeholderTextColor="#888"
+          style={styles.input}
+        />
+  
+        {/* Password Input */}
+        <TextInput
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          placeholderTextColor="#888"
+          style={styles.input}
+        />
+  
+        {/* Forgot Password */}
+        <Text style={styles.forgotText}>Forgot Password?</Text>
+  
+        {/* Error Text */}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+  
+        {/* Submit Button */}
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={onLogin}
+          disabled={loading}
+        >
+          <Text style={styles.loginButtonText}>Log In</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -89,7 +92,7 @@ const styles = StyleSheet.create({
   },
   logoWrapper: {
     position: 'absolute',
-    top: 100,
+    top: 85,
     alignSelf: 'center',
     alignItems: 'center',
   },
@@ -113,11 +116,14 @@ const styles = StyleSheet.create({
   },
   tagline: {
     position: 'absolute',
-    top: 170, // position just under GEM
+    top: 150,
     fontSize: 14,
     color: '#FFFFFF',
     textAlign: 'center',
     alignSelf: 'center',
+  },
+  formWrapper: {
+    marginTop: -80, // 👈 shifts all form content upward slightly
   },
   sectionTitle: {
     fontSize: 20,
