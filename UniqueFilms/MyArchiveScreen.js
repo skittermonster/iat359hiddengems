@@ -1,8 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { 
+  View, 
+  Text, 
+  FlatList, 
+  TouchableOpacity, 
+  Image, 
+  StyleSheet, 
+  ActivityIndicator, 
+  Alert 
+} from 'react-native';
 import { auth, db } from './firebase';
-import { collection, onSnapshot, doc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
-import { Bookmark, BookmarkCheck } from 'lucide-react-native'; // Use same icons as HomeScreen
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  deleteDoc, 
+  getDoc, 
+  setDoc 
+} from 'firebase/firestore';
+
+// Example icons from lucide-react-native
+// You can replace them with your own icons if you prefer
+import { BookmarkCheck, Trash2, Play, Star } from 'lucide-react-native';
 
 export default function MyArchiveScreen({ navigation }) {
   const [archivedMovies, setArchivedMovies] = useState([]);
@@ -64,8 +83,8 @@ export default function MyArchiveScreen({ navigation }) {
     };
   }, []);
 
-  // Mimic the HomeScreen toggle functionality for removal
-  const toggleFavorite = async (movie) => {
+  // Remove movie from archive (trash icon)
+  const removeFromArchive = async (movie) => {
     try {
       const userId = auth.currentUser?.uid;
       if (!userId) {
@@ -76,7 +95,7 @@ export default function MyArchiveScreen({ navigation }) {
       const favoritesDocRef = doc(db, 'users', userId, 'collections', 'favorites');
       const archiveDocRef = doc(db, 'archives', userId, 'movies', movieId);
 
-      // Since the movie is already archived, toggling means removal.
+      // Remove from local favorites object
       const updatedFavorites = { ...favoriteMovies };
       delete updatedFavorites[movieId];
 
@@ -87,44 +106,62 @@ export default function MyArchiveScreen({ navigation }) {
       
       Alert.alert('Removed', `"${movie.title}" removed from your archive`);
     } catch (err) {
-      console.error('Error toggling favorite:', err);
+      console.error('Error removing from archive:', err);
       Alert.alert('Error', 'Failed to update archive: ' + err.message);
     }
   };
 
-  const renderMovie = ({ item }) => {
+  // Example "play" action
+  const handlePlay = (movie) => {
+    Alert.alert('Play', `Playing "${movie.title}"...`);
+    // or navigate to your player screen
+  };
+
+  const renderMovie = ({ item, index }) => {
+    // If you specifically want the first item to have a trash icon
+    // and the rest to have a play icon (like your screenshot),
+    // you can do something like:
+    const showTrashIcon = index === 0; // or any other condition you prefer
+
     return (
-      <TouchableOpacity
-        onPress={() => navigation.navigate('MovieDetail', { movie: item, isFavorite: true })}
-        style={styles.movieCard}
-      >
+      <View style={styles.itemContainer}>
+        {/* Poster / thumbnail */}
         <Image
           source={{ uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }}
           style={styles.poster}
         />
-        <View style={styles.movieInfo}>
-          <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.rating}>★ {item.vote_average?.toFixed(1) || 'N/A'}</Text>
-          <Text style={styles.date} numberOfLines={1}>
-            Added: {new Date(item.addedAt).toLocaleDateString()}
-          </Text>
+        
+        {/* Title & Rating */}
+        <View style={styles.infoContainer}>
+          <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+          <View style={styles.ratingContainer}>
+            <Star size={16} color="#FFC107" fill="#FFC107" />
+            <Text style={styles.ratingText}>
+              {item.vote_average?.toFixed(1) || 'N/A'}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity 
-          style={styles.favoriteButton}
-          onPress={() => toggleFavorite(item)}
-          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }} // Increased hit area
+
+        {/* Icon on the right */}
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => showTrashIcon ? removeFromArchive(item) : handlePlay(item)}
           activeOpacity={0.7}
         >
-          <BookmarkCheck size={24} color="white" fill="#4CAF50" />
+          {showTrashIcon ? (
+            <Trash2 size={24} color="#FFFFFF" />
+          ) : (
+            <Play size={24} color="#FFFFFF" />
+          )}
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
     );
   };
 
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
+        <ActivityIndicator size="large" color="#FFFFFF" />
         <Text style={styles.loadingText}>Loading your archive...</Text>
       </View>
     );
@@ -140,19 +177,27 @@ export default function MyArchiveScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>My Archive</Text>
+
+      {/* Top Header */}
+      <View style={styles.header}>
+        <Text style={styles.logoText}>GEM</Text>
+      </View>
+
+      {/* Sub-header */}
+      <Text style={styles.archivedTitle}>Archived Gems</Text>
+
       {archivedMovies.length > 0 ? (
         <FlatList
           data={archivedMovies}
           renderItem={renderMovie}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.moviesList}
+          contentContainerStyle={styles.listContent}
         />
       ) : (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Your archive is empty.</Text>
           <Text style={styles.emptySubText}>
-            Add movies to your archive by tapping the bookmark icon when browsing movies.
+            Add movies to your archive by tapping the bookmark icon when browsing.
           </Text>
         </View>
       )}
@@ -161,68 +206,94 @@ export default function MyArchiveScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  // Main container: dark background
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#121212', // or #000
+    paddingTop: 40, // for status bar spacing if needed
   },
+  // Header area (where "GEM" sits)
+  header: {
+    height: 60,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: '#1E1E1E', 
+  },
+  logoText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  // "Archived Gems" text
+  archivedTitle: {
+    fontSize: 20,
+    color: '#FFFFFF',
+    marginVertical: 16,
+    marginHorizontal: 16,
+    fontWeight: '600',
+  },
+  // The list container
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  // Each item row
+  itemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E1E1E',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  poster: {
+    width: 60,
+    height: 90,
+    borderRadius: 4,
+    resizeMode: 'cover',
+    marginRight: 12,
+    backgroundColor: '#333',
+  },
+  infoContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingText: {
+    color: '#FFFFFF',
+    marginLeft: 4,
+    fontSize: 14,
+  },
+  iconButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  // Loading / error / empty states
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#121212',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#333',
-  },
-  moviesList: {
-    paddingBottom: 20,
-  },
-  movieCard: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 8,
-    marginBottom: 12,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
-  },
-  poster: {
-    width: 80,
-    height: 120,
-    backgroundColor: '#ddd',
-  },
-  movieInfo: {
-    flex: 1,
-    padding: 10,
-    justifyContent: 'space-between',
-  },
-  title: {
+  loadingText: {
+    marginTop: 10,
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
   },
-  rating: {
-    fontSize: 14,
-    color: '#E91E63',
-    marginBottom: 8,
-  },
-  date: {
-    fontSize: 12,
-    color: '#666',
-  },
-  favoriteButton: {
-    padding: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10, // Ensures the button is on top
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    fontSize: 16,
   },
   emptyContainer: {
     flex: 1,
@@ -243,15 +314,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 40,
     lineHeight: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
-    fontSize: 16,
-  },
-  errorText: {
-    color: 'red',
-    textAlign: 'center',
-    fontSize: 16,
   },
 });

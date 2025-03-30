@@ -1,14 +1,16 @@
-// App.js
+// App.js 
 import * as Font from 'expo-font';
 import { useFonts } from 'expo-font';
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import AuthStack from './AuthStack';
-import MainTabNavigator from './MainTabNavigator';
-import OnboardingScreen from './OnboardingScreen';
 import FirstPage from './FirstPage';
 import LoginScreen from './LoginScreen';
 import SignupScreen from './SignupScreen';
+import OnboardingScreen from './OnboardingScreen';
+import RatingsScreen from './RatingsScreen';
+import HomeScreen from './HomeScreen';           // make sure this exists
+import MovieDetailScreen from './MovieDetailScreen'; // make sure this exists
+import PhotoGalleryScreen from './PhotoGalleryScreen'; // make sure this exists
 import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -16,6 +18,24 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Text, View, ActivityIndicator } from 'react-native';
 
 const Stack = createStackNavigator();
+
+// Create a new stack navigator that integrates your screens.
+function MainStackNavigator() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="MovieDetail" component={MovieDetailScreen} />
+      <Stack.Screen 
+        name="Ratings" 
+        component={RatingsScreen} 
+        options={({ route }) => ({ 
+          title: route.params?.movie ? `Rate ${route.params.movie.title}` : "Your Reviews" 
+        })}
+      />
+      <Stack.Screen name="PhotoGallery" component={PhotoGalleryScreen} />
+    </Stack.Navigator>
+  );
+}
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -28,10 +48,9 @@ export default function App() {
   });
 
   useEffect(() => {
-    // Main auth state listener
+    // Listen for authentication state changes
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       console.log('Auth state changed:', currentUser ? 'logged in' : 'logged out');
-      
       setUser(currentUser);
       
       if (!currentUser) {
@@ -40,10 +59,8 @@ export default function App() {
         return;
       }
       
-      // Set up real-time listener for user document
+      // Set up a real-time listener for the user's document in Firestore
       const userDocRef = doc(db, 'users', currentUser.uid);
-      
-      // Subscribe to changes on the user document
       const unsubscribeDoc = onSnapshot(userDocRef, 
         (docSnapshot) => {
           if (docSnapshot.exists()) {
@@ -63,7 +80,7 @@ export default function App() {
         }
       );
       
-      // Return cleanup function
+      // Cleanup document subscription when the auth state changes
       return () => unsubscribeDoc();
     });
     
@@ -71,7 +88,7 @@ export default function App() {
   }, []);
 
   if (initializing) {
-    // Show a loading screen
+    // Render a loading indicator while the app initializes
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#0000ff" />
@@ -81,41 +98,25 @@ export default function App() {
   }
 
   return (
-  <NavigationContainer>
-    {!user ? (
-      <Stack.Navigator initialRouteName="FirstPage" screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="FirstPage" component={FirstPage} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Signup" component={SignupScreen} />
-      </Stack.Navigator>
-    ) : !isOnboarded ? (
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Onboarding">
-          {props => <OnboardingScreen {...props} userId={user.uid} />}
-        </Stack.Screen>
-      </Stack.Navigator>
-    ) : (
-      <MainTabNavigator />
-    )}
-  </NavigationContainer>
-);
-
-  // return (
-  //   <NavigationContainer>
-  //     {!user ? (
-  //       // Not logged in - show auth stack
-  //       <AuthStack />
-  //     ) : !isOnboarded ? (
-  //       // Logged in but not onboarded - show onboarding
-  //       <Stack.Navigator screenOptions={{ headerShown: false }}>
-  //         <Stack.Screen name="Onboarding">
-  //           {props => <OnboardingScreen {...props} userId={user.uid} />}
-  //         </Stack.Screen>
-  //       </Stack.Navigator>
-  //     ) : (
-  //       // Logged in and onboarded - show main app
-  //       <MainTabNavigator />
-  //     )}
-  //   </NavigationContainer>
-  // );
+    <NavigationContainer>
+      {!user ? (
+        // If no user is logged in, show the authentication flow.
+        <Stack.Navigator initialRouteName="FirstPage" screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="FirstPage" component={FirstPage} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Signup" component={SignupScreen} />
+        </Stack.Navigator>
+      ) : !isOnboarded ? (
+        // If the user hasn't completed onboarding, show the OnboardingScreen.
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Onboarding">
+            {props => <OnboardingScreen {...props} userId={user.uid} />}
+          </Stack.Screen>
+        </Stack.Navigator>
+      ) : (
+        // If logged in and onboarded, render the MainStackNavigator.
+        <MainStackNavigator />
+      )}
+    </NavigationContainer>
+  );
 }
