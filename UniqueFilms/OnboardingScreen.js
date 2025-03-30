@@ -1,6 +1,3 @@
-
-
-// OnboardingScreen.js
 import React, { useState } from 'react';
 import { View, Text, Button, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { auth, db } from './firebase';
@@ -58,80 +55,153 @@ export default function OnboardingScreen({ userId }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome!</Text>
-      <Text style={styles.subtitle}>Select your preferred genre:</Text>
-      
-      <FlatList
-        data={genres}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
+      {/* GEM Logo */}
+      <View style={styles.logoWrapper}>
+        <Text style={styles.logoGlow}>GEM</Text>
+        <Text style={styles.logo}>GEM</Text>
+      </View>
+  
+      {/* Section Title */}
+      <Text style={styles.sectionTitle}>Select Your Favourite Genres</Text>
+  
+      {/* Genre Selection Grid */}
+      <View style={styles.genreGrid}>
+        {genres.map((item) => (
           <TouchableOpacity
+            key={item.id}
             onPress={() => onSelectGenre(item)}
             style={[
-              styles.genreItem,
-              selectedGenre?.id === item.id && styles.selectedGenre
+              styles.genreButton,
+              selectedGenre?.id === item.id && styles.genreButtonSelected,
             ]}
           >
-            <Text style={[
-              styles.genreText,
-              selectedGenre?.id === item.id && styles.selectedGenreText
-            ]}>
+            <Text
+              style={[
+                styles.genreButtonText,
+                selectedGenre?.id === item.id && styles.genreButtonTextSelected,
+              ]}
+            >
               {item.name}
             </Text>
           </TouchableOpacity>
-        )}
-      />
-      
+        ))}
+      </View>
+  
+      {/* Error Message */}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      
-      {loading ? (
-        <ActivityIndicator size="large" color="#0000ff" />
-      ) : (
-        <Button
-          title="Continue"
-          onPress={onContinue}
-          disabled={!selectedGenre}
-        />
-      )}
+  
+      {/* Next Button */}
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={onContinue}
+        disabled={!selectedGenre || loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#181820" />
+        ) : (
+          <Text style={styles.primaryButtonText}>Next</Text>
+        )}
+      </TouchableOpacity>
+  
+      {/* Skip For Now Button */}
+      <TouchableOpacity
+        style={styles.secondaryButton}
+        onPress={() => console.log('Skip pressed')}
+      >
+        <Text style={styles.secondaryButtonText}>Skip For Now</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
+  logoWrapper: {
+    marginTop: 70,
+    alignItems: 'center',
+    marginBottom: 30,
   },
-  title: {
-    fontSize: 24,
+  logoGlow: {
+    position: 'absolute',
+    fontSize: 42,
+    fontFamily: 'Lato',
     fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
+    color: '#FFFFFF',
+    textShadowColor: '#FFFFFF',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 7,
+    zIndex: 0,
   },
-  subtitle: {
-    fontSize: 18,
+  logo: {
+    fontSize: 42,
+    fontFamily: 'Lato',
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    zIndex: 1,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    color: '#F2EFD0',
+    fontFamily: 'Righteous',
+    marginBottom: 15,
+  },
+  genreGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'center',
+    marginBottom: 40,
+  },
+  genreButton: {
+    borderWidth: 1,
+    borderColor: '#F2EFD0',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    margin: 5,
+  },
+  genreButtonSelected: {
+    backgroundColor: '#38383F',
+  },
+  genreButtonText: {
+    color: '#F2EFD0',
+    fontSize: 14,
+  },
+  genreButtonTextSelected: {
+    fontWeight: 'bold',
+  },
+  primaryButton: {
+    backgroundColor: '#F2EFD0',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
     marginBottom: 20,
   },
-  genreItem: {
-    padding: 15,
-    backgroundColor: 'white',
-    marginVertical: 5,
-    borderRadius: 5,
+  primaryButtonText: {
+    fontSize: 18,
+    fontFamily: 'Righteous',
+    color: '#181820',
+  },
+  secondaryButton: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#F2EFD0',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    shadowColor: '#F2EFD0',
+    shadowOpacity: 0.7,
+    shadowRadius: 7,
   },
-  selectedGenre: {
-    backgroundColor: '#e0e0ff',
-    borderColor: '#9090ff',
-  },
-  genreText: {
+  secondaryButtonText: {
     fontSize: 16,
+    fontFamily: 'Righteous',
+    color: '#F2EFD0',
   },
-  selectedGenreText: {
-    fontWeight: 'bold',
+  container: {
+    flex: 1,
+    backgroundColor: '#181820',
+    paddingHorizontal: 25,
+    paddingTop: 60,
   },
-  errorText: {
-    color: 'red',
-    marginVertical: 10,
-  }
 });
