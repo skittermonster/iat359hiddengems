@@ -14,8 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { auth, db } from './firebase'; 
-// If you have a storage helper, e.g. "uploadImage(uri)", import it here
-//import { uploadImage } from './firebaseStorage'; 
 
 export default function ProfileScreen({ navigation }) {
   const [user, setUser] = useState(null);
@@ -104,18 +102,14 @@ export default function ProfileScreen({ navigation }) {
         Alert.alert('Error', 'User is not logged in!');
         return;
       }
-      // 1) Upload to Firebase Storage to get a download URL
-      //    Replace this with your actual upload logic:
-      // const downloadUrl = await uploadImage(uri);
-      
       // For demonstration, we’ll just store the local URI in Firestore
       const downloadUrl = uri; 
 
-      // 2) Save the downloadUrl to the user doc
+      // Save the downloadUrl to the user doc
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, { profilePic: downloadUrl }, { merge: true });
       
-      // 3) Update state
+      // Update state
       setProfilePic(downloadUrl);
     } catch (error) {
       console.error('Error updating profile picture:', error);
@@ -130,12 +124,9 @@ export default function ProfileScreen({ navigation }) {
       return;
     }
     try {
-      // Update Firebase Authentication profile
       await updateProfile(user, { displayName: newUserName });
-      // Also update Firestore user doc (if you store username there)
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, { displayName: newUserName }, { merge: true });
-      // Update local state
       setUser({ ...user, displayName: newUserName });
       setIsEditingUserName(false);
       Alert.alert('Success', 'Username updated successfully.');
@@ -162,81 +153,95 @@ export default function ProfileScreen({ navigation }) {
       </View>
 
       {/* Profile Header Section */}
-      <View style={styles.profileHeader}>
-        {/* Pressing on the avatar triggers picking an image from gallery */}
+      <View style={styles.profileHeaderRow}>
         <TouchableOpacity onPress={handlePickImage} style={styles.profileImageContainer}>
           {profilePic ? (
             <Image source={{ uri: profilePic }} style={styles.profileImage} />
           ) : (
-            <Ionicons name="person-circle-outline" size={100} color="#555" />
+            <Ionicons name="person-circle-outline" size={80} color="#555" />
           )}
         </TouchableOpacity>
 
-        {/* Display or Edit Username */}
-        {isEditingUserName ? (
-          <View style={styles.editUserNameContainer}>
-            <TextInput 
-              style={styles.userNameInput}
-              value={newUserName}
-              onChangeText={setNewUserName}
-              placeholder="Enter username"
-              placeholderTextColor="#ccc"
-            />
-            <TouchableOpacity onPress={handleUpdateUserName} style={styles.saveUserNameButton}>
-              <Text style={styles.saveUserNameButtonText}>Save</Text>
+        <View style={styles.userInfoContainer}>
+          {isEditingUserName ? (
+            <View style={styles.editUserNameContainer}>
+              <TextInput 
+                style={styles.userNameInput}
+                value={newUserName}
+                onChangeText={setNewUserName}
+                placeholder="Enter username"
+                placeholderTextColor="#ccc"
+              />
+              <TouchableOpacity onPress={handleUpdateUserName} style={styles.saveUserNameButton}>
+                <Text style={styles.saveUserNameButtonText}>Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setIsEditingUserName(false)} style={styles.cancelUserNameButton}>
+                <Text style={styles.cancelUserNameButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => setIsEditingUserName(true)}>
+              <Text style={styles.userName}>{user.displayName || 'User Name'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setIsEditingUserName(false)} style={styles.cancelUserNameButton}>
-              <Text style={styles.cancelUserNameButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity onPress={() => setIsEditingUserName(true)}>
-            <Text style={styles.userName}>{user.displayName || 'User Name'}</Text>
-          </TouchableOpacity>
-        )}
-
-        <Text style={styles.userEmail}>{user.email}</Text>
-
-        {/* "Your Reviews" Button */}
-        <TouchableOpacity 
-          style={styles.ratingsButton} 
-          onPress={() => navigation.navigate('Ratings')}
-        >
-          <Ionicons name="star" size={16} color="#fff" />
-          <Text style={styles.ratingsButtonText}> Your Reviews</Text>
-        </TouchableOpacity>
-
-        {/* "Photo Reviews" Button */}
-        <TouchableOpacity 
-          style={[styles.ratingsButton, { marginTop: 10, backgroundColor: '#2196F3' }]}
-          onPress={handleCaptureImage}
-        >
-          <Ionicons name="camera" size={16} color="#fff" />
-          <Text style={styles.ratingsButtonText}> Photo Reviews</Text>
-        </TouchableOpacity>
+          )}
+          <Text style={styles.userEmail}>{user.email}</Text>
+        </View>
       </View>
+
+      {/* "My Ratings" Button */}
+      <TouchableOpacity 
+        style={styles.mainButton} 
+        onPress={() => navigation.navigate('Ratings')}
+      >
+        <Ionicons name="star" size={16} color="#0f0f0f" />
+        <Text style={styles.mainButtonText}>  My Ratings</Text>
+      </TouchableOpacity>
+
+      {/* "My Notes" Button */}
+      <TouchableOpacity 
+        style={[styles.mainButton, { marginTop: 10 }]}
+        onPress={() => navigation.navigate('Notes')} 
+      >
+        <Ionicons name="document-text-outline" size={16} color="#0f0f0f" />
+        <Text style={styles.mainButtonText}>  My Notes</Text>
+      </TouchableOpacity>
 
       {/* Account Settings */}
       <View style={styles.settingsContainer}>
         <Text style={styles.settingsTitle}>Account Settings</Text>
         <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('EditProfile')}>
-          <Text style={styles.settingsItemText}>Edit Profile</Text>
+          <View style={styles.settingsItemLeft}>
+            <Ionicons name="person-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.settingsItemText}>Edit Profile</Text>
+          </View>
           <Ionicons name="chevron-forward" size={20} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('Subscription')}>
-          <Text style={styles.settingsItemText}>Subscription & Billing</Text>
+          <View style={styles.settingsItemLeft}>
+            <Ionicons name="card-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.settingsItemText}>Subscription & Billing</Text>
+          </View>
           <Ionicons name="chevron-forward" size={20} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('Notifications')}>
-          <Text style={styles.settingsItemText}>Notifications</Text>
+          <View style={styles.settingsItemLeft}>
+            <Ionicons name="notifications-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.settingsItemText}>Notifications</Text>
+          </View>
           <Ionicons name="chevron-forward" size={20} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('PrivacySettings')}>
-          <Text style={styles.settingsItemText}>Privacy Settings</Text>
+          <View style={styles.settingsItemLeft}>
+            <Ionicons name="lock-closed-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.settingsItemText}>Privacy Settings</Text>
+          </View>
           <Ionicons name="chevron-forward" size={20} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('HelpSupport')}>
-          <Text style={styles.settingsItemText}>Help & Support</Text>
+          <View style={styles.settingsItemLeft}>
+            <Ionicons name="help-circle-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.settingsItemText}>Help & Support</Text>
+          </View>
           <Ionicons name="chevron-forward" size={20} color="#999" />
         </TouchableOpacity>
       </View>
@@ -265,25 +270,38 @@ const styles = StyleSheet.create({
   },
   logo: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: 'bold',
   },
-  profileHeader: {
+  /***** PROFILE HEADER ROW *****/
+  profileHeaderRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
   profileImageContainer: {
-    marginBottom: 12,
+    marginRight: 16,
   },
   profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  userInfoContainer: {
+    flex: 1, 
+    justifyContent: 'center',
   },
   userName: {
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  userEmail: {
+    color: '#ccc',
+    fontSize: 14,
+    marginTop: 4,
   },
   editUserNameContainer: {
     flexDirection: 'row',
@@ -318,35 +336,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
   },
-  userEmail: {
-    color: '#ccc',
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  ratingsButton: {
+  /***** BUTTONS *****/
+  mainButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    justifyContent: 'center',
+    backgroundColor: '#F4ECC3',
+    paddingVertical: 10,
+    width: '80%', // Both buttons will now have the same width
     borderRadius: 8,
-    marginTop: 12,
+    marginTop: 16,
+    alignSelf: 'center',
   },
-  ratingsButtonText: {
-    color: '#fff',
+  mainButtonText: {
+    color: '#0f0f0f',
     fontSize: 16,
+    fontWeight: '600',
   },
+  /***** SETTINGS *****/
   settingsContainer: {
     backgroundColor: '#1F1F1F',
     marginHorizontal: 16,
     borderRadius: 12,
     padding: 16,
     marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#F4ECC3',
   },
   settingsTitle: {
-    color: '#ccc',
+    color: '#F4ECC3',
     fontSize: 16,
     marginBottom: 8,
+    fontWeight: '600',
   },
   settingsItem: {
     flexDirection: 'row',
@@ -356,22 +377,29 @@ const styles = StyleSheet.create({
     borderBottomColor: '#333',
     borderBottomWidth: 1,
   },
+  settingsItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   settingsItemText: {
     color: '#fff',
     fontSize: 16,
   },
+  /***** SIGN OUT *****/
   signOutButton: {
-    marginTop: 30,
+    marginTop: 15,
     alignSelf: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#F4ECC3',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   signOutButtonText: {
-    color: '#fff',
+    color: '#0f0f0f',
     fontSize: 16,
+    fontWeight: '600',
   },
+  /***** INFO (NO USER) *****/
   info: {
     color: '#fff',
     fontSize: 18,
