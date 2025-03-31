@@ -1,3 +1,5 @@
+//firebase storage
+
 import { storage } from './firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 

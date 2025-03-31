@@ -1,4 +1,3 @@
-// home screen 
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -10,13 +9,13 @@ import {
   ActivityIndicator, 
   SafeAreaView, 
   Alert,
-  Modal,
   ScrollView
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MyArchiveScreen from './MyArchiveScreen';
 import ProfileScreen from './ProfileScreen.js';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db } from './firebase';
 import { 
   doc, 
@@ -30,32 +29,19 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { Bookmark, BookmarkCheck, Camera, Star, X, Image as ImageIcon } from 'lucide-react-native';
-import { launchCamera } from 'react-native-image-picker';
-import { uploadImage } from './firebaseStorage';
 
 // TMDB API key
 const TMDB_API_KEY = '1102d81d4603c7d20f1fc0ba2d1b6031';
 
-// --- HomeScreen Component (Backup Version) ---
 function HomeScreen({ navigation }) {
-  // Movie and user state variables
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userGenre, setUserGenre] = useState(null);
   const [favoriteMovies, setFavoriteMovies] = useState({});
-
-  // Photo functionality states
-  const [photoModalVisible, setPhotoModalVisible] = useState(false);
-  const [photoUri, setPhotoUri] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  
-  // User photos state
   const [userPhotos, setUserPhotos] = useState([]);
-  const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
 
-  // Fetch user preferences, favorite movies, and photos
+  // Fetch user preferences, favorites, and photos
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -87,7 +73,6 @@ function HomeScreen({ navigation }) {
     fetchUserData();
   }, []);
 
-  // Function to fetch user photos
   const fetchUserPhotos = async (userId) => {
     try {
       const photosQuery = query(
@@ -106,7 +91,6 @@ function HomeScreen({ navigation }) {
     }
   };
 
-  // Refresh photos after uploading
   const refreshPhotos = async () => {
     const userId = auth.currentUser?.uid;
     if (userId) {
@@ -114,7 +98,6 @@ function HomeScreen({ navigation }) {
     }
   };
 
-  // Fetch movies based on user genre
   useEffect(() => {
     const fetchMovies = async () => {
       if (!userGenre) return;
@@ -141,7 +124,6 @@ function HomeScreen({ navigation }) {
     fetchMovies();
   }, [userGenre]);
 
-  // Toggle favorite status for a movie
   const toggleFavorite = async (movie) => {
     try {
       const userId = auth.currentUser?.uid;
@@ -183,8 +165,8 @@ function HomeScreen({ navigation }) {
     }
   };
 
-  // Photo functionality methods
-  const takePhoto = async () => {
+  // --- New Camera Capture Logic (from working example) ---
+  const captureImage = async () => {
     try {
       const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
       if (!permissionResult.granted) {
@@ -198,71 +180,43 @@ function HomeScreen({ navigation }) {
       });
       if (!result.canceled) {
         const uri = result.assets[0].uri;
-        setPhotoUri(uri);
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          Alert.alert("User is not logged in!");
+          return;
+        }
+        const userId = currentUser.uid;
+        const photoCollection = collection(db, 'archives', userId, 'photos');
+        await setDoc(doc(photoCollection), {
+          imageUrl: uri,
+          userId: userId,
+          createdAt: serverTimestamp(),
+          type: 'review'
+        });
+        Alert.alert('Success', 'Photo review captured and uploaded!');
+        await refreshPhotos();
       }
     } catch (error) {
       console.error('Error capturing image:', error);
       Alert.alert('Error', 'Could not capture image');
     }
   };
-  const handleUpload = async () => {
-    if (!photoUri) {
-      Alert.alert('Error', 'Please take a photo first');
-      return;
-    }
+
+  const deletePhoto = async (photoId) => {
     try {
-      setUploading(true);
       const userId = auth.currentUser?.uid;
       if (!userId) {
-        Alert.alert('Error', 'You must be logged in to upload photos');
-        setUploading(false);
+        Alert.alert('Error', 'User not authenticated');
         return;
       }
-      const url = await uploadImage(photoUri);
-      const photoData = {
-        imageUrl: url,
-        userId: userId,
-        createdAt: serverTimestamp(),
-        type: 'review'
-      };
-      const photoCollection = collection(db, 'archives', userId, 'photos');
-      await setDoc(doc(photoCollection), photoData);
-      Alert.alert('Success', 'Your photo review was uploaded successfully!');
-      setPhotoUri(null);
-      setPhotoModalVisible(false);
+      await deleteDoc(doc(db, 'archives', userId, 'photos', photoId));
       await refreshPhotos();
+      Alert.alert('Success', 'Photo deleted successfully');
     } catch (error) {
-      console.error('Upload failed:', error);
-      Alert.alert('Error', 'Failed to upload photo: ' + error.message);
-    } finally {
-      setUploading(false);
+      console.error('Error deleting photo:', error);
+      Alert.alert('Error', 'Failed to delete photo: ' + error.message);
     }
   };
-
-  const openPhotoViewer = (photo) => {
-    setSelectedPhoto(photo);
-    setPhotoViewerVisible(true);
-  };
-
-  // Updated deletePhoto function with correct collection path
-const deletePhoto = async (photoId) => {
-  try {
-    const userId = auth.currentUser?.uid;
-    if (!userId) {
-      Alert.alert('Error', 'User not authenticated');
-      return;
-    }
-    // Delete photo from the correct collection ('archives')
-    await deleteDoc(doc(db, 'archives', userId, 'photos', photoId));
-    setPhotoViewerVisible(false);
-    setSelectedPhoto(null);
-    await refreshPhotos();
-    Alert.alert('Success', 'Photo deleted successfully');
-  } catch (error) {
-    console.error('Error deleting photo:', error);
-    Alert.alert('Error', 'Failed to delete photo: ' + error.message);
-  }
-};
 
   const confirmDeletePhoto = (photo) => {
     Alert.alert(
@@ -318,7 +272,10 @@ const deletePhoto = async (photoId) => {
     return (
       <TouchableOpacity 
         style={styles.photoCard}
-        onPress={() => openPhotoViewer(item)}
+        onPress={() => {
+          // For simplicity, we prompt deletion on press.
+          confirmDeletePhoto(item);
+        }}
       >
         <Image
           source={{ uri: item.imageUrl }}
@@ -326,7 +283,7 @@ const deletePhoto = async (photoId) => {
           resizeMode="cover"
         />
         <Text style={styles.photoDate}>
-          {new Date(item.createdAt).toLocaleDateString()}
+          {new Date(item.createdAt?.toDate ? item.createdAt.toDate() : item.createdAt).toLocaleDateString()}
         </Text>
       </TouchableOpacity>
     );
@@ -349,86 +306,6 @@ const deletePhoto = async (photoId) => {
   }
   return (
     <SafeAreaView style={styles.container}>
-      {/* Photo Modal */}
-      <Modal
-        animationType="slide"
-        transparent={false}
-        visible={photoModalVisible}
-        onRequestClose={() => setPhotoModalVisible(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add Photo Review</Text>
-            <TouchableOpacity 
-              onPress={() => {
-                setPhotoUri(null);
-                setPhotoModalVisible(false);
-              }}
-            >
-              <X size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.modalContent}>
-            <TouchableOpacity 
-              style={styles.cameraButton} 
-              onPress={takePhoto}
-            >
-              <Camera size={24} color="white" style={styles.buttonIcon} />
-              <Text style={styles.buttonText}>Take Photo</Text>
-            </TouchableOpacity>
-            {photoUri && (
-              <View style={styles.previewContainer}>
-                <Image source={{ uri: photoUri }} style={styles.preview} />
-                <TouchableOpacity 
-                  style={[styles.uploadButton, uploading && styles.disabledButton]} 
-                  onPress={handleUpload}
-                  disabled={uploading}
-                >
-                  <Text style={styles.buttonText}>
-                    {uploading ? 'Uploading...' : 'Upload Photo Review'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </SafeAreaView>
-      </Modal>
-      {/* Photo Viewer Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={photoViewerVisible}
-        onRequestClose={() => setPhotoViewerVisible(false)}
-      >
-        <View style={styles.photoViewerContainer}>
-          <View style={styles.photoViewerContent}>
-            <View style={styles.photoViewerHeader}>
-              <Text style={styles.photoViewerTitle}>Photo Review</Text>
-              <TouchableOpacity onPress={() => setPhotoViewerVisible(false)}>
-                <X size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            {selectedPhoto && (
-              <View style={styles.photoViewerImageContainer}>
-                <Image 
-                  source={{ uri: selectedPhoto.imageUrl }} 
-                  style={styles.photoViewerImage}
-                  resizeMode="contain"
-                />
-                <Text style={styles.photoViewerDate}>
-                  Taken on: {new Date(selectedPhoto.createdAt).toLocaleString()}
-                </Text>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => confirmDeletePhoto(selectedPhoto)}
-                >
-                  <Text style={styles.deleteButtonText}>Delete Photo</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Hidden Gems Cinema</Text>
@@ -441,7 +318,7 @@ const deletePhoto = async (photoId) => {
         <View style={styles.actionButtonContainer}>
           <TouchableOpacity
             style={styles.cameraButton}
-            onPress={() => setPhotoModalVisible(true)}
+            onPress={captureImage}  // Uses new working logic
             activeOpacity={0.7}
           >
             <Camera size={20} color="white" style={styles.buttonIcon} />
@@ -480,7 +357,7 @@ const deletePhoto = async (photoId) => {
             <View style={styles.emptyPhotosContainer}>
               <ImageIcon size={40} color="#999" />
               <Text style={styles.emptyPhotosText}>
-                No photo reviews yet. Take some photos of your movie experiences!
+                No photo reviews yet. Capture some photos of your movie experiences!
               </Text>
             </View>
           )}
@@ -517,20 +394,18 @@ const deletePhoto = async (photoId) => {
   );
 }
 
-// --- Bottom Tab Navigator ---
 const Tab = createBottomTabNavigator();
 
 export default function MainTabNavigator() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
-  <Tab.Screen name="Home" component={HomeScreen} />
-  <Tab.Screen name="Archive" component={MyArchiveScreen} />
-  <Tab.Screen name="Profile" component={ProfileScreen} />
-</Tab.Navigator>
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Archive" component={MyArchiveScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+    </Tab.Navigator>
   );
 }
 
-// --- Styles (Paste your backup styles here) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   scrollContainer: { flex: 1 },
@@ -559,27 +434,8 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: 10, color: '#666', fontSize: 16 },
   errorText: { color: 'red', textAlign: 'center', fontSize: 16 },
   noMoviesText: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 20 },
-  emptyPhotosContainer: { height: 160, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, marginHorizontal: 16, padding: 16 },
-  emptyPhotosText: { marginTop: 12, color: '#666', textAlign: 'center', fontSize: 14 },
   actionButtonContainer: { paddingHorizontal: 16, marginVertical: 16 },
   cameraButton: { backgroundColor: '#4CAF50', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16, textAlign: 'center' },
   buttonIcon: { marginRight: 8 },
-  modalContainer: { flex: 1, backgroundColor: '#f5f5f5' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
-  modalContent: { flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' },
-  previewContainer: { alignItems: 'center', marginTop: 20, width: '100%' },
-  preview: { width: 300, height: 300, borderRadius: 8, marginBottom: 20 },
-  uploadButton: { backgroundColor: '#2196F3', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 8, width: 300 },
-  disabledButton: { backgroundColor: '#9E9E9E' },
-  photoViewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center' },
-  photoViewerContent: { width: '90%', maxHeight: '80%', backgroundColor: 'white', borderRadius: 12, overflow: 'hidden' },
-  photoViewerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
-  photoViewerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  photoViewerImageContainer: { alignItems: 'center', padding: 16 },
-  photoViewerImage: { width: '100%', height: 300, borderRadius: 8 },
-  photoViewerDate: { fontSize: 14, color: '#666', marginTop: 12, marginBottom: 16 },
-  deleteButton: { backgroundColor: '#F44336', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, marginTop: 8, width: '80%', alignItems: 'center' },
-  deleteButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
 });
