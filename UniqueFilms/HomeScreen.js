@@ -1,33 +1,13 @@
 // home screen
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  FlatList, 
-  Image, 
-  TouchableOpacity, 
-  StyleSheet, 
-  ActivityIndicator, 
-  SafeAreaView, 
-  Alert,
-  ScrollView
-} from 'react-native';
+import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, Alert,ScrollView} from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MyArchiveScreen from './MyArchiveScreen';
 import ProfileScreen from './ProfileScreen.js';
 import { auth, db } from './firebase';
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  deleteDoc, 
-  collection, 
-  getDocs, 
-  query, 
-  orderBy, 
-  serverTimestamp 
-} from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, serverTimestamp} from 'firebase/firestore';
 import { Bookmark, BookmarkCheck } from 'lucide-react-native';
+export default HomeScreen;
 
 // TMDB API key
 const TMDB_API_KEY = '1102d81d4603c7d20f1fc0ba2d1b6031';
@@ -225,18 +205,6 @@ function HomeScreen({ navigation }) {
         )}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-const Tab = createBottomTabNavigator();
-
-export default function MainTabNavigator() {
-  return (
-    <Tab.Navigator screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Archive" component={MyArchiveScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
   );
 }
 

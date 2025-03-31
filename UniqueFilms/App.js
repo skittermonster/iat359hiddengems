@@ -8,7 +8,7 @@ import LoginScreen from './LoginScreen';
 import SignupScreen from './SignupScreen';
 import OnboardingScreen from './OnboardingScreen';
 import RatingsScreen from './RatingsScreen';
-import HomeScreen from './HomeScreen';           // make sure this exists
+import MainTabNavigator from './MainTabNavigator';
 import MovieDetailScreen from './MovieDetailScreen'; // make sure this exists
 import PhotoGalleryScreen from './PhotoGalleryScreen'; // make sure this exists
 import { auth, db } from './firebase';
@@ -22,17 +22,26 @@ const Stack = createStackNavigator();
 // Create a new stack navigator that integrates your screens.
 function MainStackNavigator() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="Home" component={HomeScreen} />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen 
+        name="MainTabs" 
+        component={MainTabNavigator} 
+        options={{ headerShown: false }} // 👈 hide the top nav bar
+      />
       <Stack.Screen name="MovieDetail" component={MovieDetailScreen} />
       <Stack.Screen 
         name="Ratings" 
         component={RatingsScreen} 
         options={({ route }) => ({ 
-          title: route.params?.movie ? `Rate ${route.params.movie.title}` : "Your Reviews" 
+          title: route.params?.movie ? `Rate ${route.params.movie.title}` : "Your Reviews",
+          headerShown: true,
         })}
       />
-      <Stack.Screen name="PhotoGallery" component={PhotoGalleryScreen} />
+      <Stack.Screen 
+        name="PhotoGallery" 
+        component={PhotoGalleryScreen}
+        options={{ headerShown: true }}
+      />
     </Stack.Navigator>
   );
 }

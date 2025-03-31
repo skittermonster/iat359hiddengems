@@ -61,64 +61,66 @@ export default function OnboardingScreen({ userId }) {
         <Text style={styles.logo}>GEM</Text>
       </View>
   
-      {/* Section Title */}
-      <Text style={styles.sectionTitle}>Select Your Favourite Genres</Text>
+      {/* Main content */}
+      <View style={styles.mainContent}>
+        <Text style={styles.sectionTitle}>Select Your Favourite Genres</Text>
   
-      {/* Genre Selection Grid */}
-      <View style={styles.genreGrid}>
-        {genres.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            onPress={() => onSelectGenre(item)}
-            style={[
-              styles.genreButton,
-              selectedGenre?.id === item.id && styles.genreButtonSelected,
-            ]}
-          >
-            <Text
+        <View style={styles.genreGrid}>
+          {genres.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              onPress={() => onSelectGenre(item)}
               style={[
-                styles.genreButtonText,
-                selectedGenre?.id === item.id && styles.genreButtonTextSelected,
+                styles.genreButton,
+                selectedGenre?.id === item.id && styles.genreButtonSelected,
               ]}
             >
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text
+                style={[
+                  styles.genreButtonText,
+                  selectedGenre?.id === item.id && styles.genreButtonTextSelected,
+                ]}
+              >
+                {item.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+  
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>
   
-      {/* Error Message */}
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {/* Bottom buttons */}
+      <View style={styles.buttonWrapper}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={onContinue}
+          disabled={!selectedGenre || loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#181820" />
+          ) : (
+            <Text style={styles.primaryButtonText}>Next</Text>
+          )}
+        </TouchableOpacity>
   
-      {/* Next Button */}
-      <TouchableOpacity
-        style={styles.primaryButton}
-        onPress={onContinue}
-        disabled={!selectedGenre || loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#181820" />
-        ) : (
-          <Text style={styles.primaryButtonText}>Next</Text>
-        )}
-      </TouchableOpacity>
-  
-      {/* Skip For Now Button */}
-      <TouchableOpacity
-        style={styles.secondaryButton}
-        onPress={() => console.log('Skip pressed')}
-      >
-        <Text style={styles.secondaryButtonText}>Skip For Now</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => console.log('Skip pressed')}
+        >
+          <Text style={styles.secondaryButtonText}>Skip For Now</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   logoWrapper: {
-    marginTop: 70,
+    position: 'absolute',
+    top: 85,
+    alignSelf: 'center',
     alignItems: 'center',
-    marginBottom: 30,
   },
   logoGlow: {
     position: 'absolute',
@@ -139,10 +141,12 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 22,
     color: '#F2EFD0',
     fontFamily: 'Righteous',
+    marginTop: 160, // ⬅️ Pushes the title below the logo
     marginBottom: 15,
+    alignSelf: 'center',
   },
   genreGrid: {
     flexDirection: 'row',
@@ -154,8 +158,8 @@ const styles = StyleSheet.create({
   genreButton: {
     borderWidth: 1,
     borderColor: '#F2EFD0',
-    borderRadius: 8,
-    paddingVertical: 8,
+    borderRadius: 5,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     margin: 5,
   },
@@ -167,34 +171,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   genreButtonTextSelected: {
-    fontWeight: 'bold',
+    fontWeight: 'nornmal',
   },
   primaryButton: {
+    width: 307,
+    height: 56,
     backgroundColor: '#F2EFD0',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 56,
-    marginBottom: 20,
+    alignSelf: 'center',
   },
   primaryButtonText: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: 'Righteous',
     color: '#181820',
   },
   secondaryButton: {
+    width: 307,
+    height: 56,
     borderWidth: 1,
     borderColor: '#F2EFD0',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 56,
+    alignSelf: 'center',
     shadowColor: '#F2EFD0',
     shadowOpacity: 0.7,
     shadowRadius: 7,
   },
   secondaryButtonText: {
-    fontSize: 16,
+    fontSize: 20,
     fontFamily: 'Righteous',
     color: '#F2EFD0',
   },
@@ -203,5 +210,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#181820',
     paddingHorizontal: 25,
     paddingTop: 60,
+  },
+  
+  mainContent: {
+    flexGrow: 0,
+    marginBottom: 20, // ⬅️ this will shrink the space and push buttons up
+  },
+  
+  buttonWrapper: {
+    gap: 15,
+    marginTop: 'auto',
+    marginBottom: 100, // 👈 Pushes it up from the very bottom a bit
   },
 });
