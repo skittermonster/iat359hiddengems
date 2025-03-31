@@ -11,11 +11,9 @@ import {
   Alert,
   ScrollView
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MyArchiveScreen from './MyArchiveScreen';
 import ProfileScreen from './ProfileScreen.js';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db } from './firebase';
 import { 
   doc, 
@@ -28,7 +26,7 @@ import {
   orderBy, 
   serverTimestamp 
 } from 'firebase/firestore';
-import { Bookmark, BookmarkCheck, Camera, Star, X, Image as ImageIcon } from 'lucide-react-native';
+import { Bookmark, BookmarkCheck } from 'lucide-react-native';
 
 // TMDB API key
 const TMDB_API_KEY = '1102d81d4603c7d20f1fc0ba2d1b6031';
@@ -39,9 +37,8 @@ function HomeScreen({ navigation }) {
   const [error, setError] = useState(null);
   const [userGenre, setUserGenre] = useState(null);
   const [favoriteMovies, setFavoriteMovies] = useState({});
-  const [userPhotos, setUserPhotos] = useState([]);
 
-  // Fetch user preferences, favorites, and photos
+  // Fetch user preferences and favorites
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -63,8 +60,6 @@ function HomeScreen({ navigation }) {
         if (favoritesSnapshot.exists()) {
           setFavoriteMovies(favoritesSnapshot.data().movies || {});
         }
-        // Get user photos
-        await fetchUserPhotos(userId);
       } catch (err) {
         console.error('Error fetching user data:', err);
         setError('Failed to load user data');
@@ -72,31 +67,6 @@ function HomeScreen({ navigation }) {
     };
     fetchUserData();
   }, []);
-
-  const fetchUserPhotos = async (userId) => {
-    try {
-      const photosQuery = query(
-        collection(db, 'archives', userId, 'photos'),
-        orderBy('createdAt', 'desc')
-      );
-      const querySnapshot = await getDocs(photosQuery);
-      const photos = [];
-      querySnapshot.forEach((doc) => {
-        photos.push({ id: doc.id, ...doc.data() });
-      });
-      setUserPhotos(photos);
-    } catch (error) {
-      console.error('Error fetching photos:', error);
-      Alert.alert('Error', 'Failed to load your photos');
-    }
-  };
-
-  const refreshPhotos = async () => {
-    const userId = auth.currentUser?.uid;
-    if (userId) {
-      await fetchUserPhotos(userId);
-    }
-  };
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -165,74 +135,6 @@ function HomeScreen({ navigation }) {
     }
   };
 
-  // --- New Camera Capture Logic (from working example) ---
-  const captureImage = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert('Permission to access the camera is required!');
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 1,
-      });
-      if (!result.canceled) {
-        const uri = result.assets[0].uri;
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-          Alert.alert("User is not logged in!");
-          return;
-        }
-        const userId = currentUser.uid;
-        const photoCollection = collection(db, 'archives', userId, 'photos');
-        await setDoc(doc(photoCollection), {
-          imageUrl: uri,
-          userId: userId,
-          createdAt: serverTimestamp(),
-          type: 'review'
-        });
-        Alert.alert('Success', 'Photo review captured and uploaded!');
-        await refreshPhotos();
-      }
-    } catch (error) {
-      console.error('Error capturing image:', error);
-      Alert.alert('Error', 'Could not capture image');
-    }
-  };
-
-  const deletePhoto = async (photoId) => {
-    try {
-      const userId = auth.currentUser?.uid;
-      if (!userId) {
-        Alert.alert('Error', 'User not authenticated');
-        return;
-      }
-      await deleteDoc(doc(db, 'archives', userId, 'photos', photoId));
-      await refreshPhotos();
-      Alert.alert('Success', 'Photo deleted successfully');
-    } catch (error) {
-      console.error('Error deleting photo:', error);
-      Alert.alert('Error', 'Failed to delete photo: ' + error.message);
-    }
-  };
-
-  const confirmDeletePhoto = (photo) => {
-    Alert.alert(
-      'Delete Photo',
-      'Are you sure you want to delete this photo?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => deletePhoto(photo.id)
-        }
-      ]
-    );
-  };
-
   const renderMovie = ({ item }) => {
     const isFavorite = favoriteMovies[item.id.toString()];
     return (
@@ -268,27 +170,6 @@ function HomeScreen({ navigation }) {
     );
   };
 
-  const renderPhotoItem = ({ item }) => {
-    return (
-      <TouchableOpacity 
-        style={styles.photoCard}
-        onPress={() => {
-          // For simplicity, we prompt deletion on press.
-          confirmDeletePhoto(item);
-        }}
-      >
-        <Image
-          source={{ uri: item.imageUrl }}
-          style={styles.photoThumbnail}
-          resizeMode="cover"
-        />
-        <Text style={styles.photoDate}>
-          {new Date(item.createdAt?.toDate ? item.createdAt.toDate() : item.createdAt).toLocaleDateString()}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -314,54 +195,6 @@ function HomeScreen({ navigation }) {
         )}
       </View>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Action Buttons */}
-        <View style={styles.actionButtonContainer}>
-          <TouchableOpacity
-            style={styles.cameraButton}
-            onPress={captureImage}  // Uses new working logic
-            activeOpacity={0.7}
-          >
-            <Camera size={20} color="white" style={styles.buttonIcon} />
-            <Text style={styles.buttonText}>Add Photo Review</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.cameraButton, { backgroundColor: '#2196F3', marginTop: 12 }]}
-            onPress={() => navigation.navigate('Ratings')}
-            activeOpacity={0.7}
-          >
-            <Star size={20} color="white" style={styles.buttonIcon} />
-            <Text style={styles.buttonText}>Your Reviews</Text>
-          </TouchableOpacity>
-        </View>
-        {/* User Photos Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Your Photo Reviews</Text>
-            <TouchableOpacity 
-              style={styles.viewAllButton}
-              onPress={() => navigation.navigate('PhotoGallery', { photos: userPhotos, onDeletePhoto: refreshPhotos })}
-            >
-              <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-          {userPhotos.length > 0 ? (
-            <FlatList
-              data={userPhotos.slice(0, 5)}
-              renderItem={renderPhotoItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.photosList}
-            />
-          ) : (
-            <View style={styles.emptyPhotosContainer}>
-              <ImageIcon size={40} color="#999" />
-              <Text style={styles.emptyPhotosText}>
-                No photo reviews yet. Capture some photos of your movie experiences!
-              </Text>
-            </View>
-          )}
-        </View>
         {/* Movies Section */}
         {movies.length > 0 ? (
           <View style={styles.moviesContainer}>
@@ -413,18 +246,9 @@ const styles = StyleSheet.create({
   header: { padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#333' },
   subtitle: { fontSize: 16, color: '#666', marginTop: 4 },
-  sectionContainer: { marginVertical: 12 },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  viewAllButton: { padding: 8 },
-  viewAllText: { color: '#2196F3', fontWeight: 'bold' },
   moviesContainer: { paddingTop: 8 },
   moviesList: { paddingHorizontal: 8, paddingBottom: 16 },
-  photosList: { paddingHorizontal: 8 },
   movieCard: { width: 140, marginHorizontal: 8, backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
-  photoCard: { width: 120, height: 160, marginHorizontal: 8, backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
-  photoThumbnail: { width: '100%', height: 120, backgroundColor: '#ddd' },
-  photoDate: { fontSize: 12, color: '#666', padding: 8, textAlign: 'center' },
   poster: { width: '100%', height: 200, backgroundColor: '#ddd' },
   noPoster: { justifyContent: 'center', alignItems: 'center' },
   noPosterText: { color: '#888' },
@@ -434,8 +258,4 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: 10, color: '#666', fontSize: 16 },
   errorText: { color: 'red', textAlign: 'center', fontSize: 16 },
   noMoviesText: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 20 },
-  actionButtonContainer: { paddingHorizontal: 16, marginVertical: 16 },
-  cameraButton: { backgroundColor: '#4CAF50', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16, textAlign: 'center' },
-  buttonIcon: { marginRight: 8 },
 });

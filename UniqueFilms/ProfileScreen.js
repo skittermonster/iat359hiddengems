@@ -75,7 +75,7 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  // Use the camera to capture a profile image
+  // Use the camera to capture a profile image for a photo review
   const handleCaptureImage = async () => {
     try {
       const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
@@ -197,22 +197,22 @@ export default function ProfileScreen({ navigation }) {
 
         <Text style={styles.userEmail}>{user.email}</Text>
 
-        {/* "My Ratings" Button */}
+        {/* "Your Reviews" Button */}
         <TouchableOpacity 
           style={styles.ratingsButton} 
           onPress={() => navigation.navigate('Ratings')}
         >
           <Ionicons name="star" size={16} color="#fff" />
-          <Text style={styles.ratingsButtonText}> My Ratings</Text>
+          <Text style={styles.ratingsButtonText}> Your Reviews</Text>
         </TouchableOpacity>
 
-        {/* Extra button for capturing a new image from the camera */}
+        {/* "Photo Reviews" Button */}
         <TouchableOpacity 
           style={[styles.ratingsButton, { marginTop: 10, backgroundColor: '#2196F3' }]}
           onPress={handleCaptureImage}
         >
           <Ionicons name="camera" size={16} color="#fff" />
-          <Text style={styles.ratingsButtonText}> Capture Image</Text>
+          <Text style={styles.ratingsButtonText}> Photo Reviews</Text>
         </TouchableOpacity>
       </View>
 
@@ -249,7 +249,6 @@ export default function ProfileScreen({ navigation }) {
   );
 }
 
-/* Example styling that mimics your attached design. Feel free to customize. */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -380,4 +379,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

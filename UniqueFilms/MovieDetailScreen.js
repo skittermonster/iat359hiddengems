@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,29 +11,42 @@ import {
   Alert,
   FlatList
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { auth, db } from './firebase';
+import { 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  serverTimestamp 
+} from 'firebase/firestore';
 
-// Example icons from lucide-react-native
+// Icons
 import {
   Search,
-  PlayCircle,
-  Bookmark,
-  BookmarkCheck,
+  Play,
+  Check,
+  Share2,
   Star as StarIcon,
   ThumbsUp,
-  ThumbsDown
+  ThumbsDown,
+  Camera,
+  Image as ImageIcon
 } from 'lucide-react-native';
 
-// Example star-rating library or your own star rating logic
-// For a real app, consider using something like 'react-native-star-rating-widget' or similar
-function SimpleStarRating({ rating, setRating, maxStars = 5 }) {
+// Star rating component
+function SimpleStarRating({ rating, setRating, maxStars = 5, small = false }) {
   const starsArray = Array.from({ length: maxStars }, (_, i) => i + 1);
   return (
-    <View style={{ flexDirection: 'row', marginVertical: 8 }}>
+    <View style={{ flexDirection: 'row', marginVertical: small ? 2 : 8 }}>
       {starsArray.map((star) => (
-        <TouchableOpacity key={star} onPress={() => setRating(star)}>
+        <TouchableOpacity key={star} onPress={() => setRating && setRating(star)}>
           <StarIcon
-            size={24}
-            color={star <= rating ? '#FFD700' : '#ccc'}
+            size={small ? 16 : 24}
+            color={star <= rating ? '#FFD700' : '#555'}
             fill={star <= rating ? '#FFD700' : 'none'}
             style={{ marginRight: 4 }}
           />
@@ -44,51 +57,171 @@ function SimpleStarRating({ rating, setRating, maxStars = 5 }) {
 }
 
 export default function MovieDetailScreen({ route, navigation }) {
-  // Props passed from the previous screen
-  const { movie, isFavorite: initialIsFavorite } = route.params || {};
-  // Local states
-  const [isFavorite, setIsFavorite] = useState(initialIsFavorite || false);
+  // Movie data (for demo purposes – normally comes via props or API)
+  const movie = {
+    id: 1,
+    title: 'Hear Me: Our Summer',
+    overview: 'Young Jun works part-time at his parents\' lunch box house. Yeo Reum lives only to support a hearing-impaired swimmer sister. One day, Young Jun meets Yeo Reum at the swimming lunch boxes and falls in love at first sight. Yeo Reum slowly opens her heart to warm-hearted Young Jun.',
+    rating: 4.2,
+    runtime: '1h 49m',
+    poster_path: 'https://example.com/poster.jpg'
+  };
+
+  // States for favorite/archive and reviews (already present)
+  const [isFavorite, setIsFavorite] = useState(true);
   const [userReview, setUserReview] = useState('');
   const [userRating, setUserRating] = useState(0);
-
-  // Example reviews (static). In a real app, fetch these from your DB.
   const [reviews, setReviews] = useState([
     {
       id: '1',
-      user: 'Writer Winnie',
-      rating: 4.0,
-      text: 'I was widely smiling the whole time...',
-      helpful: 0,
+      user: 'Winter Winnie',
+      rating: 5.0,
+      text: 'I was widely smiling the whole time...I don\'t ever write reviews but this movie definitely deserves one.',
+      helpful: 10,
       unhelpful: 0,
     },
     {
       id: '2',
       user: 'Laura Min',
-      rating: 5.0,
-      text: 'Absolutely amazing. This summer story...',
-      helpful: 0,
-      unhelpful: 0,
+      rating: 4.0,
+      text: '"Hear Me: Our Summer" is a heartfelt and unforgettable film that touched me deeply.',
+      helpful: 4,
+      unhelpful: 2,
     },
   ]);
 
-  // ----- ARCHIVE / FAVORITE LOGIC (Adapt to your Firestore or local storage) -----
-  const handleToggleFavorite = () => {
-    // Replace this with your Firestore logic from your original code
-    if (!isFavorite) {
-      Alert.alert('Archived', `"${movie?.title}" added to your archive`);
-    } else {
-      Alert.alert('Removed', `"${movie?.title}" removed from your archive`);
+  // New state for photo reviews
+  const [userPhotos, setUserPhotos] = useState([]);
+
+  // Fetch user's photo reviews on mount
+  useEffect(() => {
+    refreshPhotos();
+  }, []);
+
+  // Photo review functions
+  const fetchUserPhotos = async (userId) => {
+    try {
+      const photosQuery = query(
+        collection(db, 'archives', userId, 'photos'),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(photosQuery);
+      const photos = [];
+      querySnapshot.forEach((docSnap) => {
+        photos.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setUserPhotos(photos);
+    } catch (error) {
+      console.error('Error fetching photos:', error);
+      Alert.alert('Error', 'Failed to load your photos');
     }
+  };
+
+  const refreshPhotos = async () => {
+    const userId = auth.currentUser?.uid;
+    if (userId) {
+      await fetchUserPhotos(userId);
+    }
+  };
+
+  const captureImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission to access the camera is required!');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+      });
+      if (!result.canceled) {
+        const uri = result.assets[0].uri;
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          Alert.alert("User is not logged in!");
+          return;
+        }
+        const userId = currentUser.uid;
+        const photoCollection = collection(db, 'archives', userId, 'photos');
+        await setDoc(doc(photoCollection), {
+          imageUrl: uri,
+          userId: userId,
+          createdAt: serverTimestamp(),
+          type: 'review'
+        });
+        Alert.alert('Success', 'Photo review captured and uploaded!');
+        await refreshPhotos();
+      }
+    } catch (error) {
+      console.error('Error capturing image:', error);
+      Alert.alert('Error', 'Could not capture image');
+    }
+  };
+
+  const deletePhoto = async (photoId) => {
+    try {
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+      await deleteDoc(doc(db, 'archives', userId, 'photos', photoId));
+      await refreshPhotos();
+      Alert.alert('Success', 'Photo deleted successfully');
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      Alert.alert('Error', 'Failed to delete photo: ' + error.message);
+    }
+  };
+
+  const confirmDeletePhoto = (photo) => {
+    Alert.alert(
+      'Delete Photo',
+      'Are you sure you want to delete this photo?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: () => deletePhoto(photo.id)
+        }
+      ]
+    );
+  };
+
+  const renderPhotoItem = ({ item }) => {
+    return (
+      <TouchableOpacity 
+        style={styles.photoCard}
+        onPress={() => {
+          // For simplicity, prompt deletion on press.
+          confirmDeletePhoto(item);
+        }}
+      >
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={styles.photoThumbnail}
+          resizeMode="cover"
+        />
+        <Text style={styles.photoDate}>
+          {new Date(item.createdAt?.toDate ? item.createdAt.toDate() : item.createdAt).toLocaleDateString()}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  // Existing functions for toggling favorites and posting reviews
+  const handleToggleFavorite = () => {
     setIsFavorite(!isFavorite);
   };
 
-  // ----- POST REVIEW LOGIC (Adapt to your Firestore or backend) -----
   const handlePostReview = () => {
     if (!userReview.trim()) {
       Alert.alert('Error', 'Please write something before posting a review.');
       return;
     }
-    // Example: append a new review to the local array
     const newReview = {
       id: Math.random().toString(36).substring(2),
       user: 'Current User',
@@ -103,27 +236,31 @@ export default function MovieDetailScreen({ route, navigation }) {
     Alert.alert('Review Posted', 'Your review has been added.');
   };
 
-  // ----- RENDER REVIEW ITEM -----
   const renderReviewItem = ({ item }) => {
     return (
       <View style={styles.reviewCard}>
         <View style={styles.reviewHeader}>
-          <Text style={styles.reviewUser}>{item.user}</Text>
-          <Text style={styles.reviewRating}>{item.rating} / 5</Text>
+          <View style={styles.userInfoContainer}>
+            <Image 
+              source={{ uri: 'https://via.placeholder.com/30x30' }} 
+              style={styles.userAvatar} 
+            />
+            <Text style={styles.reviewUser}>{item.user}</Text>
+          </View>
+          <SimpleStarRating rating={item.rating} small={true} />
         </View>
         <Text style={styles.reviewText}>{item.text}</Text>
         <View style={styles.reviewActions}>
           <TouchableOpacity
             style={styles.helpfulButton}
             onPress={() => {
-              // Example local increment
               const updated = reviews.map((r) =>
                 r.id === item.id ? { ...r, helpful: r.helpful + 1 } : r
               );
               setReviews(updated);
             }}
           >
-            <ThumbsUp size={16} color="#555" />
+            <ThumbsUp size={16} color="#888" />
             <Text style={styles.helpfulText}>Helpful ({item.helpful})</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -135,7 +272,7 @@ export default function MovieDetailScreen({ route, navigation }) {
               setReviews(updated);
             }}
           >
-            <ThumbsDown size={16} color="#555" />
+            <ThumbsDown size={16} color="#888" />
             <Text style={styles.helpfulText}>Unhelpful ({item.unhelpful})</Text>
           </TouchableOpacity>
         </View>
@@ -143,20 +280,13 @@ export default function MovieDetailScreen({ route, navigation }) {
     );
   };
 
-  // ----- RENDER "MORE LIKE THIS" (STATIC EXAMPLE) -----
+  // More Like This data and render function remain unchanged
   const moreLikeThisData = [
-    {
-      id: 'm1',
-      title: 'Sweet Dreams',
-      poster: 'https://via.placeholder.com/150x220.png?text=Sweet+Dreams',
-    },
-    {
-      id: 'm2',
-      title: 'Twist Bye Too Bad',
-      poster: 'https://via.placeholder.com/150x220.png?text=Twist+Bye+Too+Bad',
-    },
-    // Add more if you want
+    { id: 'm1', title: 'Sweet Dreams', poster: 'https://via.placeholder.com/150x220.png', rating: 3.5 },
+    { id: 'm2', title: 'Twist Bye Too Bad', poster: 'https://via.placeholder.com/150x220.png', rating: 4.0 },
+    { id: 'm3', title: 'Other Title', poster: 'https://via.placeholder.com/150x220.png', rating: 4.5 },
   ];
+  
   const renderSimilarMovie = ({ item }) => {
     return (
       <View style={styles.similarMovieCard}>
@@ -168,14 +298,13 @@ export default function MovieDetailScreen({ route, navigation }) {
         <Text style={styles.similarTitle} numberOfLines={2}>
           {item.title}
         </Text>
+        <View style={styles.smallRatingContainer}>
+          <StarIcon size={14} color="#FFD700" fill="#FFD700" />
+          <Text style={styles.smallRatingText}>{item.rating}</Text>
+        </View>
       </View>
     );
   };
-
-  // For the background image, fallback if no poster is provided
-  const backgroundPoster = movie?.poster_path
-    ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-    : 'https://via.placeholder.com/500x300.png?text=No+Poster';
 
   return (
     <View style={styles.screenContainer}>
@@ -187,106 +316,130 @@ export default function MovieDetailScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Hero Section with Poster */}
-      <ImageBackground
-        source={{ uri: backgroundPoster }}
-        style={styles.heroImage}
-        resizeMode="cover"
-      >
-        <View style={styles.heroOverlay}>
-          {/* Buttons: Play & Archive */}
-          <View style={styles.heroButtonsRow}>
-            <TouchableOpacity
-              style={styles.heroButton}
-              onPress={() => Alert.alert('Play', 'Play button tapped!')}
-            >
-              <PlayCircle size={20} color="white" style={{ marginRight: 6 }} />
-              <Text style={styles.heroButtonText}>Play</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.heroButton,
-                { backgroundColor: isFavorite ? '#F44336' : '#4CAF50' },
-              ]}
-              onPress={handleToggleFavorite}
-            >
-              {isFavorite ? (
-                <BookmarkCheck size={20} color="white" style={{ marginRight: 6 }} />
-              ) : (
-                <Bookmark size={20} color="white" style={{ marginRight: 6 }} />
-              )}
-              <Text style={styles.heroButtonText}>
-                {isFavorite ? 'Archived' : 'Archive'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ImageBackground>
-
-      {/* Movie Details & Overview */}
       <ScrollView style={styles.contentContainer}>
-        <View style={styles.movieInfoContainer}>
-          <Text style={styles.movieTitle}>{movie?.title || 'Unknown Title'}</Text>
-          <Text style={styles.movieSubInfo}>
-            {movie?.release_date
-              ? new Date(movie.release_date).getFullYear()
-              : 'Unknown Year'}
-          </Text>
-          <View style={styles.ratingContainer}>
-            <Text style={styles.movieRating}>
-              {movie?.vote_average?.toFixed(1) || 'N/A'}{' '}
-            </Text>
-            <StarIcon size={20} color="#FFD700" fill="#FFD700" />
+        {/* Hero Section with Poster */}
+        <ImageBackground
+          source={{ uri: movie.poster_path || 'https://via.placeholder.com/400x200' }}
+          style={styles.heroImage}
+          resizeMode="cover"
+        >
+          <View style={styles.heroOverlay}>
+            <View style={styles.heroButtonsContainer}>
+              <TouchableOpacity
+                style={styles.playButton}
+                onPress={() => Alert.alert('Play', 'Play button tapped!')}
+              >
+                <Play size={20} color="#111" style={{ marginRight: 8 }} />
+                <Text style={styles.playButtonText}>Play</Text>
+              </TouchableOpacity>
+              <View style={styles.smallButtonsContainer}>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={handleToggleFavorite}
+                >
+                  <Check size={20} color="white" />
+                  <Text style={styles.iconButtonText}>Archived</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => Alert.alert('Share', 'Share this movie')}
+                >
+                  <Share2 size={20} color="white" />
+                  <Text style={styles.iconButtonText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-          <Text style={styles.movieOverview}>
-            {movie?.overview ||
-              'No overview available for this movie. Stay tuned!'}
-          </Text>
+        </ImageBackground>
+
+        {/* Movie Details */}
+        <View style={styles.movieInfoContainer}>
+          <Text style={styles.movieTitle}>{movie.title}</Text>
+          <View style={styles.ratingRow}>
+            <StarIcon size={16} color="#FFD700" fill="#FFD700" />
+            <Text style={styles.movieRating}>{movie.rating}</Text>
+            <Text style={styles.bulletPoint}>•</Text>
+            <Text style={styles.movieRuntime}>{movie.runtime}</Text>
+          </View>
+          <Text style={styles.movieOverview}>{movie.overview}</Text>
+        </View>
+
+        {/* Photo Reviews Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Photo Reviews</Text>
+            {/* Optionally, add a "View All" if needed */}
+            <TouchableOpacity style={styles.viewAllButton}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={styles.cameraButton}
+            onPress={captureImage}
+            activeOpacity={0.7}
+          >
+            <Camera size={20} color="white" style={styles.buttonIcon} />
+            <Text style={styles.buttonText}>Add Photo Review</Text>
+          </TouchableOpacity>
+          {userPhotos.length > 0 ? (
+            <FlatList
+              data={userPhotos.slice(0, 5)}
+              renderItem={renderPhotoItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.photosList}
+            />
+          ) : (
+            <View style={styles.emptyPhotosContainer}>
+              <ImageIcon size={40} color="#999" />
+              <Text style={styles.emptyPhotosText}>
+                No photo reviews yet. Capture some photos of your movie experiences!
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Write a Review Section */}
         <View style={styles.reviewInputContainer}>
-          <Text style={styles.writeReviewTitle}>Write a Review</Text>
+          <Text style={styles.writeReviewTitle}>Write A Review</Text>
           <TextInput
             style={styles.reviewInput}
             placeholder="Share your thoughts about the movie..."
-            placeholderTextColor="#aaa"
+            placeholderTextColor="#888"
             value={userReview}
-            onChangeText={(text) => setUserReview(text)}
+            onChangeText={setUserReview}
             multiline
           />
-          <Text style={styles.yourRatingText}>Your Rating:</Text>
-          <SimpleStarRating rating={userRating} setRating={setUserRating} />
-          <TouchableOpacity style={styles.postReviewButton} onPress={handlePostReview}>
-            <Text style={styles.postReviewButtonText}>Post Review</Text>
-          </TouchableOpacity>
+          <View style={styles.ratingSubmitRow}>
+            <View style={styles.yourRatingContainer}>
+              <Text style={styles.yourRatingText}>Your Rating:</Text>
+              <SimpleStarRating rating={userRating} setRating={setUserRating} />
+            </View>
+            <TouchableOpacity style={styles.postReviewButton} onPress={handlePostReview}>
+              <Text style={styles.postReviewButtonText}>Post Review</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Reviews Section */}
         <View style={styles.reviewsSection}>
           <View style={styles.reviewsHeader}>
             <Text style={styles.reviewSectionTitle}>Reviews</Text>
-            {/* Example: average rating out of 5 */}
-            <Text style={styles.reviewSectionSubtitle}>
-              {(
-                reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
-              ).toFixed(1)}{' '}
-              / 5
-            </Text>
+            <Text style={styles.reviewSectionRating}>4.5<Text style={styles.reviewMaxRating}> / 5</Text></Text>
           </View>
           <FlatList
-            data={reviews.slice(0, 2)} // only show first 2 for example
+            data={reviews}
             keyExtractor={(item) => item.id}
             renderItem={renderReviewItem}
+            scrollEnabled={false}
           />
-          {reviews.length > 2 && (
-            <TouchableOpacity
-              style={styles.showMoreButton}
-              onPress={() => Alert.alert('Show More', 'Show all reviews')}
-            >
-              <Text style={styles.showMoreButtonText}>Show More</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.showMoreButton}
+            onPress={() => Alert.alert('Show More', 'Show all reviews')}
+          >
+            <Text style={styles.showMoreButtonText}>Show More</Text>
+          </TouchableOpacity>
         </View>
 
         {/* More Like This Section */}
@@ -298,7 +451,7 @@ export default function MovieDetailScreen({ route, navigation }) {
             renderItem={renderSimilarMovie}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 4 }}
+            contentContainerStyle={{ paddingLeft: 4 }}
           />
         </View>
       </ScrollView>
@@ -307,64 +460,73 @@ export default function MovieDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  // Main container
+  // Screen container and navigation styles
   screenContainer: {
     flex: 1,
-    backgroundColor: '#000', // Dark background
+    backgroundColor: '#121212',
   },
-
-  // Top navigation
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#222',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(30, 30, 30, 0.9)',
   },
   navTitle: {
     color: 'white',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
   },
   searchIcon: {
     padding: 4,
   },
-
-  // Hero section
+  contentContainer: {
+    flex: 1,
+    backgroundColor: '#121212',
+  },
+  // Hero section styles
   heroImage: {
     width: '100%',
-    height: 200,
+    height: 220,
     justifyContent: 'flex-end',
   },
   heroOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingVertical: 12,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingBottom: 16,
+  },
+  heroButtonsContainer: {
     paddingHorizontal: 16,
   },
-  heroButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-  },
-  heroButton: {
+  playButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FF9800',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    justifyContent: 'center',
+    backgroundColor: '#F5F5DC',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 6,
-    marginRight: 12,
+    marginBottom: 12,
   },
-  heroButtonText: {
+  playButtonText: {
+    color: '#111',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  smallButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  iconButton: {
+    alignItems: 'center',
+    marginLeft: 24,
+  },
+  iconButtonText: {
     color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12,
+    marginTop: 4,
   },
-
-  // Content container
-  contentContainer: {
-    flex: 1,
-    backgroundColor: '#1C1C1C',
-  },
+  // Movie details styles
   movieInfoContainer: {
     padding: 16,
   },
@@ -372,70 +534,165 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  movieSubInfo: {
-    color: '#ccc',
-    fontSize: 14,
     marginBottom: 8,
   },
-  ratingContainer: {
+  ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   movieRating: {
     color: '#FFD700',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    marginRight: 4,
+    marginLeft: 4,
+    marginRight: 6,
+  },
+  bulletPoint: {
+    color: '#888',
+    marginRight: 6,
+  },
+  movieRuntime: {
+    color: '#888',
+    fontSize: 14,
   },
   movieOverview: {
-    color: '#ddd',
+    color: '#CCC',
     fontSize: 14,
     lineHeight: 20,
-    marginTop: 4,
   },
-
-  // Write a Review
+  // Photo Reviews section styles
+  sectionContainer: {
+    marginVertical: 12,
+    paddingHorizontal: 16,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  viewAllButton: {
+    padding: 8,
+  },
+  viewAllText: {
+    color: '#2196F3',
+    fontWeight: 'bold',
+  },
+  cameraButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 8,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+    textAlign: 'center',
+    marginLeft: 8,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  photosList: {
+    paddingHorizontal: 8,
+    paddingBottom: 16,
+  },
+  photoCard: {
+    width: 120,
+    height: 160,
+    marginHorizontal: 8,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  photoThumbnail: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#ddd',
+  },
+  photoDate: {
+    fontSize: 12,
+    color: '#666',
+    padding: 8,
+    textAlign: 'center',
+  },
+  emptyPhotosContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 12,
+  },
+  emptyPhotosText: {
+    color: '#999',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  // Write a Review section styles
   reviewInputContainer: {
     padding: 16,
-    backgroundColor: '#2A2A2A',
-    borderRadius: 8,
-    margin: 16,
   },
   writeReviewTitle: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   reviewInput: {
-    backgroundColor: '#3A3A3A',
+    backgroundColor: '#222',
     color: 'white',
-    borderRadius: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#333',
     padding: 12,
     minHeight: 80,
     textAlignVertical: 'top',
+    marginBottom: 16,
+  },
+  ratingSubmitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  yourRatingContainer: {
+    flex: 1,
   },
   yourRatingText: {
-    color: 'white',
-    marginTop: 12,
+    color: '#BBB',
+    fontSize: 14,
   },
   postReviewButton: {
-    backgroundColor: '#FFD700',
-    paddingVertical: 12,
+    backgroundColor: '#F5F5DC',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 6,
-    alignItems: 'center',
-    marginTop: 12,
   },
   postReviewButtonText: {
     color: '#333',
-    fontWeight: 'bold',
-    fontSize: 16,
+    fontWeight: '600',
+    fontSize: 14,
   },
-
-  // Reviews section
+  // Reviews section styles
   reviewsSection: {
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -444,45 +701,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   reviewSectionTitle: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  reviewSectionSubtitle: {
+  reviewSectionRating: {
     color: '#FFD700',
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  reviewMaxRating: {
+    color: '#999',
+    fontWeight: 'normal',
   },
   reviewCard: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#222',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 12,
   },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  userInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 8,
+    backgroundColor: '#444',
   },
   reviewUser: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 14,
   },
-  reviewRating: {
-    color: '#FFD700',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
   reviewText: {
     color: '#ddd',
-    marginVertical: 8,
     fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
   },
   reviewActions: {
     flexDirection: 'row',
-    marginTop: 8,
+    marginTop: 4,
   },
   helpfulButton: {
     flexDirection: 'row',
@@ -490,20 +761,25 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   helpfulText: {
-    color: '#ccc',
+    color: '#999',
+    fontSize: 12,
     marginLeft: 4,
   },
   showMoreButton: {
     alignSelf: 'center',
-    padding: 8,
+    backgroundColor: '#333',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginTop: 8,
   },
   showMoreButtonText: {
-    color: '#2196F3',
-    fontWeight: 'bold',
+    color: '#CCC',
+    fontSize: 14,
   },
-
-  // More Like This
+  // More Like This section styles
   moreLikeThisContainer: {
+    paddingTop: 8,
     paddingHorizontal: 16,
     paddingBottom: 24,
   },
@@ -511,7 +787,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   similarMovieCard: {
     width: 120,
@@ -521,12 +797,22 @@ const styles = StyleSheet.create({
     width: 120,
     height: 180,
     borderRadius: 8,
-    backgroundColor: '#444',
+    backgroundColor: '#333',
     marginBottom: 6,
   },
   similarTitle: {
-    color: '#ccc',
+    color: 'white',
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  smallRatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  smallRatingText: {
+    color: '#FFD700',
     fontSize: 12,
-    textAlign: 'center',
+    marginLeft: 2,
   },
 });
+
