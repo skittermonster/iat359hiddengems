@@ -13,33 +13,38 @@ const Tab = createBottomTabNavigator();
 export default function MainTabNavigator() {
   return (
     <Tab.Navigator
-      // Common styling for the tab bar
       screenOptions={({ route }) => ({
-        // Provide a function that returns the icon based on the route name
         tabBarIcon: ({ focused, color, size }) => {
+          const iconColor = focused ? '#FFFFFF' : '#999999';
+          const iconSize = 26;
+
           switch (route.name) {
             case 'Home':
-              return <HomeIcon color={color} size={size} />;
+              return <HomeIcon color={iconColor} size={iconSize} />;
             case 'Archive':
-              // You can switch to <Airplane /> if you prefer that
-              return <Gem color={color} size={size} />;
+              return <Gem color={iconColor} size={iconSize} />;
             case 'Profile':
-              return <UserIcon color={color} size={size} />;
+              return <UserIcon color={iconColor} size={iconSize} />;
             default:
               return null;
           }
         },
-        // Tab bar colors
         tabBarActiveTintColor: '#FFFFFF',
         tabBarInactiveTintColor: '#999999',
         tabBarStyle: {
-          backgroundColor: '#1C1C1C', // or whatever dark color you like
+          backgroundColor: '#181820',
+          height: 85,
+          paddingTop: 10,
+          paddingBottom: 25,
+          borderTopWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
         },
-        // Label style if you want to tweak font size, etc.
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 13,
+          marginTop: 4,
         },
-        headerShown: false, // Hides the top header if you prefer
+        headerShown: false,
       })}
     >
       <Tab.Screen 
