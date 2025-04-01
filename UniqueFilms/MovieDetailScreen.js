@@ -1,27 +1,31 @@
-import React, { useState, useEffect } from 'react';
+// details screen 
+
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
+  SafeAreaView,
   View,
   Text,
   ImageBackground,
   Image,
-  TextInput,
   ScrollView,
-  TouchableOpacity,
+  ActivityIndicator,
   StyleSheet,
+  TouchableOpacity,
   Alert,
-  FlatList
+  FlatList,
+  TextInput,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from './firebase';
-import { 
-  doc, 
-  setDoc, 
-  deleteDoc, 
-  collection, 
-  getDocs, 
-  query, 
-  orderBy, 
-  serverTimestamp 
+import {
+  doc,
+  setDoc,
+  deleteDoc,
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  serverTimestamp,
 } from 'firebase/firestore';
 
 // Icons
@@ -34,10 +38,12 @@ import {
   ThumbsUp,
   ThumbsDown,
   Camera,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ArrowLeft,
 } from 'lucide-react-native';
 
-// Star rating component
+import { useNavigation } from '@react-navigation/native';
+
 function SimpleStarRating({ rating, setRating, maxStars = 5, small = false }) {
   const starsArray = Array.from({ length: maxStars }, (_, i) => i + 1);
   return (
@@ -56,19 +62,28 @@ function SimpleStarRating({ rating, setRating, maxStars = 5, small = false }) {
   );
 }
 
-export default function MovieDetailScreen({ route, navigation }) {
-  // Movie data (for demo purposes – normally comes via props or API)
-  const movie = {
-    id: 1,
-    title: 'Hear Me: Our Summer',
-    overview: 'Young Jun works part-time at his parents\' lunch box house. Yeo Reum lives only to support a hearing-impaired swimmer sister. One day, Young Jun meets Yeo Reum at the swimming lunch boxes and falls in love at first sight. Yeo Reum slowly opens her heart to warm-hearted Young Jun.',
-    rating: 4.2,
-    runtime: '1h 49m',
-    poster_path: 'https://example.com/poster.jpg'
-  };
+export default function MovieDetailScreen({ route }) {
+  const navigation = useNavigation();
 
-  // States for favorite/archive and reviews (already present)
-  const [isFavorite, setIsFavorite] = useState(true);
+  // Hide default header if not done in stack config:
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
+
+  const { movie } = route.params;
+  const TMDB_API_KEY = '1102d81d4603c7d20f1fc0ba2d1b6031'; // Replace with your actual key
+
+  const [movieDetails, setMovieDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Toggle for archived/favorite
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Photo reviews
+  const [userPhotos, setUserPhotos] = useState([]);
+
+  // Text reviews
   const [userReview, setUserReview] = useState('');
   const [userRating, setUserRating] = useState(0);
   const [reviews, setReviews] = useState([
@@ -76,7 +91,7 @@ export default function MovieDetailScreen({ route, navigation }) {
       id: '1',
       user: 'Winter Winnie',
       rating: 5.0,
-      text: 'I was widely smiling the whole time...I don\'t ever write reviews but this movie definitely deserves one.',
+      text: "I was widely smiling the whole time...I don't ever write reviews but this movie definitely deserves one.",
       helpful: 10,
       unhelpful: 0,
     },
@@ -90,15 +105,58 @@ export default function MovieDetailScreen({ route, navigation }) {
     },
   ]);
 
-  // New state for photo reviews
-  const [userPhotos, setUserPhotos] = useState([]);
+  // Dummy "More Like This" data
+  const moreLikeThisData = [
+    { id: 'm1', title: 'Sweet Dreams', poster: 'https://via.placeholder.com/150x220.png', rating: 3.5 },
+    { id: 'm2', title: 'Twist Bye Too Bad', poster: 'https://via.placeholder.com/150x220.png', rating: 4.0 },
+    { id: 'm3', title: 'Other Title', poster: 'https://via.placeholder.com/150x220.png', rating: 4.5 },
+  ];
 
-  // Fetch user's photo reviews on mount
+  // Format runtime (e.g., 109 -> "1h 49m")
+  const formatRuntime = (mins) => {
+    if (!mins) return '';
+    const hours = Math.floor(mins / 60);
+    const minutes = mins % 60;
+    return `${hours}h ${minutes}m`;
+  };
+
+  // Fetch movie details
+  useEffect(() => {
+    const fetchMovieDetails = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(
+          `https://api.themoviedb.org/3/movie/${movie.id}?api_key=${TMDB_API_KEY}`
+        );
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.log('Error response:', errorText);
+          throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        setMovieDetails(data);
+      } catch (err) {
+        console.error('Error fetching movie details:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMovieDetails();
+  }, [movie.id]);
+
+  // Photo reviews
   useEffect(() => {
     refreshPhotos();
   }, []);
 
-  // Photo review functions
+  const refreshPhotos = async () => {
+    const userId = auth.currentUser?.uid;
+    if (userId) {
+      await fetchUserPhotos(userId);
+    }
+  };
+
   const fetchUserPhotos = async (userId) => {
     try {
       const photosQuery = query(
@@ -114,13 +172,6 @@ export default function MovieDetailScreen({ route, navigation }) {
     } catch (error) {
       console.error('Error fetching photos:', error);
       Alert.alert('Error', 'Failed to load your photos');
-    }
-  };
-
-  const refreshPhotos = async () => {
-    const userId = auth.currentUser?.uid;
-    if (userId) {
-      await fetchUserPhotos(userId);
     }
   };
 
@@ -140,7 +191,7 @@ export default function MovieDetailScreen({ route, navigation }) {
         const uri = result.assets[0].uri;
         const currentUser = auth.currentUser;
         if (!currentUser) {
-          Alert.alert("User is not logged in!");
+          Alert.alert('Error', 'User is not logged in!');
           return;
         }
         const userId = currentUser.uid;
@@ -149,7 +200,7 @@ export default function MovieDetailScreen({ route, navigation }) {
           imageUrl: uri,
           userId: userId,
           createdAt: serverTimestamp(),
-          type: 'review'
+          type: 'review',
         });
         Alert.alert('Success', 'Photo review captured and uploaded!');
         await refreshPhotos();
@@ -182,41 +233,32 @@ export default function MovieDetailScreen({ route, navigation }) {
       'Are you sure you want to delete this photo?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
-          onPress: () => deletePhoto(photo.id)
-        }
+          onPress: () => deletePhoto(photo.id),
+        },
       ]
     );
   };
 
-  const renderPhotoItem = ({ item }) => {
-    return (
-      <TouchableOpacity 
-        style={styles.photoCard}
-        onPress={() => {
-          // For simplicity, prompt deletion on press.
-          confirmDeletePhoto(item);
-        }}
-      >
-        <Image
-          source={{ uri: item.imageUrl }}
-          style={styles.photoThumbnail}
-          resizeMode="cover"
-        />
-        <Text style={styles.photoDate}>
-          {new Date(item.createdAt?.toDate ? item.createdAt.toDate() : item.createdAt).toLocaleDateString()}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
+  const renderPhotoItem = ({ item }) => (
+    <TouchableOpacity style={styles.photoCard} onPress={() => confirmDeletePhoto(item)}>
+      <Image source={{ uri: item.imageUrl }} style={styles.photoThumbnail} resizeMode="cover" />
+      <Text style={styles.photoDate}>
+        {new Date(
+          item.createdAt?.toDate ? item.createdAt.toDate() : item.createdAt
+        ).toLocaleDateString()}
+      </Text>
+    </TouchableOpacity>
+  );
 
-  // Existing functions for toggling favorites and posting reviews
+  // Archive/favorite toggle
   const handleToggleFavorite = () => {
     setIsFavorite(!isFavorite);
   };
 
+  // Posting text reviews
   const handlePostReview = () => {
     if (!userReview.trim()) {
       Alert.alert('Error', 'Please write something before posting a review.');
@@ -236,80 +278,86 @@ export default function MovieDetailScreen({ route, navigation }) {
     Alert.alert('Review Posted', 'Your review has been added.');
   };
 
-  const renderReviewItem = ({ item }) => {
-    return (
-      <View style={styles.reviewCard}>
-        <View style={styles.reviewHeader}>
-          <View style={styles.userInfoContainer}>
-            <Image 
-              source={{ uri: 'https://via.placeholder.com/30x30' }} 
-              style={styles.userAvatar} 
-            />
-            <Text style={styles.reviewUser}>{item.user}</Text>
-          </View>
-          <SimpleStarRating rating={item.rating} small={true} />
+  const renderReviewItem = ({ item }) => (
+    <View style={styles.reviewCard}>
+      <View style={styles.reviewHeader}>
+        <View style={styles.userInfoContainer}>
+          <Image
+            source={{ uri: 'https://via.placeholder.com/30x30' }}
+            style={styles.userAvatar}
+          />
+          <Text style={styles.reviewUser}>{item.user}</Text>
         </View>
-        <Text style={styles.reviewText}>{item.text}</Text>
-        <View style={styles.reviewActions}>
-          <TouchableOpacity
-            style={styles.helpfulButton}
-            onPress={() => {
-              const updated = reviews.map((r) =>
-                r.id === item.id ? { ...r, helpful: r.helpful + 1 } : r
-              );
-              setReviews(updated);
-            }}
-          >
-            <ThumbsUp size={16} color="#888" />
-            <Text style={styles.helpfulText}>Helpful ({item.helpful})</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.helpfulButton}
-            onPress={() => {
-              const updated = reviews.map((r) =>
-                r.id === item.id ? { ...r, unhelpful: r.unhelpful + 1 } : r
-              );
-              setReviews(updated);
-            }}
-          >
-            <ThumbsDown size={16} color="#888" />
-            <Text style={styles.helpfulText}>Unhelpful ({item.unhelpful})</Text>
-          </TouchableOpacity>
-        </View>
+        <SimpleStarRating rating={item.rating} small={true} />
       </View>
-    );
-  };
+      <Text style={styles.reviewText}>{item.text}</Text>
+      <View style={styles.reviewActions}>
+        <TouchableOpacity
+          style={styles.helpfulButton}
+          onPress={() => {
+            const updated = reviews.map((r) =>
+              r.id === item.id ? { ...r, helpful: r.helpful + 1 } : r
+            );
+            setReviews(updated);
+          }}
+        >
+          <ThumbsUp size={16} color="#888" />
+          <Text style={styles.helpfulText}>Helpful ({item.helpful})</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.helpfulButton}
+          onPress={() => {
+            const updated = reviews.map((r) =>
+              r.id === item.id ? { ...r, unhelpful: r.unhelpful + 1 } : r
+            );
+            setReviews(updated);
+          }}
+        >
+          <ThumbsDown size={16} color="#888" />
+          <Text style={styles.helpfulText}>Unhelpful ({item.unhelpful})</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
-  // More Like This data and render function remain unchanged
-  const moreLikeThisData = [
-    { id: 'm1', title: 'Sweet Dreams', poster: 'https://via.placeholder.com/150x220.png', rating: 3.5 },
-    { id: 'm2', title: 'Twist Bye Too Bad', poster: 'https://via.placeholder.com/150x220.png', rating: 4.0 },
-    { id: 'm3', title: 'Other Title', poster: 'https://via.placeholder.com/150x220.png', rating: 4.5 },
-  ];
-  
-  const renderSimilarMovie = ({ item }) => {
-    return (
-      <View style={styles.similarMovieCard}>
-        <Image
-          source={{ uri: item.poster }}
-          style={styles.similarPoster}
-          resizeMode="cover"
-        />
-        <Text style={styles.similarTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <View style={styles.smallRatingContainer}>
-          <StarIcon size={14} color="#FFD700" fill="#FFD700" />
-          <Text style={styles.smallRatingText}>{item.rating}</Text>
-        </View>
+  // "More Like This" render
+  const renderSimilarMovie = ({ item }) => (
+    <View style={styles.similarMovieCard}>
+      <Image source={{ uri: item.poster }} style={styles.similarPoster} resizeMode="cover" />
+      <Text style={styles.similarTitle} numberOfLines={2}>
+        {item.title}
+      </Text>
+      <View style={styles.smallRatingContainer}>
+        <StarIcon size={14} color="#FFD700" fill="#FFD700" />
+        <Text style={styles.smallRatingText}>{item.rating}</Text>
       </View>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.screenContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#F5F5DC" />
+        <Text style={{ color: 'white', marginTop: 10 }}>Loading movie details...</Text>
+      </SafeAreaView>
     );
-  };
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.screenContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: 'red' }}>{error}</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={styles.screenContainer}>
-      {/* Top Navigation Bar */}
+    <SafeAreaView style={styles.screenContainer}>
+      {/* Custom Top Bar */}
       <View style={styles.navBar}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIcon}>
+          <ArrowLeft size={24} color="white" />
+        </TouchableOpacity>
         <Text style={styles.navTitle}>GEM</Text>
         <TouchableOpacity style={styles.searchIcon}>
           <Search size={24} color="white" />
@@ -317,67 +365,69 @@ export default function MovieDetailScreen({ route, navigation }) {
       </View>
 
       <ScrollView style={styles.contentContainer}>
-        {/* Hero Section with Poster */}
+        {/* Poster/Thumbnail */}
         <ImageBackground
-          source={{ uri: movie.poster_path || 'https://via.placeholder.com/400x200' }}
+          source={{
+            uri: movieDetails.poster_path
+              ? `https://image.tmdb.org/t/p/w500${movieDetails.poster_path}`
+              : 'https://via.placeholder.com/400x200',
+          }}
           style={styles.heroImage}
           resizeMode="cover"
-        >
-          <View style={styles.heroOverlay}>
-            <View style={styles.heroButtonsContainer}>
-              <TouchableOpacity
-                style={styles.playButton}
-                onPress={() => Alert.alert('Play', 'Play button tapped!')}
-              >
-                <Play size={20} color="#111" style={{ marginRight: 8 }} />
-                <Text style={styles.playButtonText}>Play</Text>
-              </TouchableOpacity>
-              <View style={styles.smallButtonsContainer}>
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={handleToggleFavorite}
-                >
-                  <Check size={20} color="white" />
-                  <Text style={styles.iconButtonText}>Archived</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={() => Alert.alert('Share', 'Share this movie')}
-                >
-                  <Share2 size={20} color="white" />
-                  <Text style={styles.iconButtonText}>Share</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </ImageBackground>
+        />
 
-        {/* Movie Details */}
-        <View style={styles.movieInfoContainer}>
-          <Text style={styles.movieTitle}>{movie.title}</Text>
-          <View style={styles.ratingRow}>
-            <StarIcon size={16} color="#FFD700" fill="#FFD700" />
-            <Text style={styles.movieRating}>{movie.rating}</Text>
-            <Text style={styles.bulletPoint}>•</Text>
-            <Text style={styles.movieRuntime}>{movie.runtime}</Text>
-          </View>
-          <Text style={styles.movieOverview}>{movie.overview}</Text>
+        {/* Button Row BELOW the poster */}
+        <View style={styles.buttonRow}>
+          {/* Archive */}
+          <TouchableOpacity style={styles.smallButton} onPress={handleToggleFavorite}>
+            <Check size={20} color="white" />
+            <Text style={styles.smallButtonText}>
+              {isFavorite ? 'Archived' : 'Archive'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Play */}
+          <TouchableOpacity
+            style={styles.playButtonRow}
+            onPress={() => Alert.alert('Play', 'Play button tapped!')}
+          >
+            <Play size={20} color="#111" style={{ marginRight: 6 }} />
+            <Text style={styles.playButtonText}>Play</Text>
+          </TouchableOpacity>
+
+          {/* Share */}
+          <TouchableOpacity
+            style={styles.smallButton}
+            onPress={() => Alert.alert('Share', 'Share this movie')}
+          >
+            <Share2 size={20} color="white" />
+            <Text style={styles.smallButtonText}>Share</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Photo Reviews Section */}
+        {/* Movie Info */}
+        <View style={styles.movieInfoContainer}>
+          <Text style={styles.movieTitle}>{movieDetails.title}</Text>
+          <View style={styles.ratingRow}>
+            <StarIcon size={16} color="#FFD700" fill="#FFD700" />
+            <Text style={styles.movieRating}>
+              {movieDetails.vote_average ? movieDetails.vote_average.toFixed(1) : 'N/A'}
+            </Text>
+            <Text style={styles.bulletPoint}>•</Text>
+            <Text style={styles.movieRuntime}>{formatRuntime(movieDetails.runtime)}</Text>
+          </View>
+          <Text style={styles.movieOverview}>{movieDetails.overview}</Text>
+        </View>
+
+        {/* Photo Reviews */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Photo Reviews</Text>
-            {/* Optionally, add a "View All" if needed */}
-            <TouchableOpacity style={styles.viewAllButton}>
+            <TouchableOpacity style={styles.viewAllButton} onPress={() => Alert.alert('All Photos')}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.cameraButton}
-            onPress={captureImage}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity style={styles.cameraButton} onPress={captureImage} activeOpacity={0.7}>
             <Camera size={20} color="white" style={styles.buttonIcon} />
             <Text style={styles.buttonText}>Add Photo Review</Text>
           </TouchableOpacity>
@@ -400,7 +450,7 @@ export default function MovieDetailScreen({ route, navigation }) {
           )}
         </View>
 
-        {/* Write a Review Section */}
+        {/* Write a Review */}
         <View style={styles.reviewInputContainer}>
           <Text style={styles.writeReviewTitle}>Write A Review</Text>
           <TextInput
@@ -422,11 +472,13 @@ export default function MovieDetailScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* Reviews Section */}
+        {/* Reviews List */}
         <View style={styles.reviewsSection}>
           <View style={styles.reviewsHeader}>
             <Text style={styles.reviewSectionTitle}>Reviews</Text>
-            <Text style={styles.reviewSectionRating}>4.5<Text style={styles.reviewMaxRating}> / 5</Text></Text>
+            <Text style={styles.reviewSectionRating}>
+              4.5<Text style={styles.reviewMaxRating}> / 5</Text>
+            </Text>
           </View>
           <FlatList
             data={reviews}
@@ -442,7 +494,7 @@ export default function MovieDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* More Like This Section */}
+        {/* More Like This */}
         <View style={styles.moreLikeThisContainer}>
           <Text style={styles.moreLikeThisTitle}>More Like This</Text>
           <FlatList
@@ -455,12 +507,11 @@ export default function MovieDetailScreen({ route, navigation }) {
           />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  // Screen container and navigation styles
   screenContainer: {
     flex: 1,
     backgroundColor: '#121212',
@@ -472,6 +523,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: 'rgba(30, 30, 30, 0.9)',
+  },
+  backIcon: {
+    padding: 4,
+    marginRight: 8,
   },
   navTitle: {
     color: 'white',
@@ -485,48 +540,40 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#121212',
   },
-  // Hero section styles
   heroImage: {
     width: '100%',
     height: 220,
-    justifyContent: 'flex-end',
   },
-  heroOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingBottom: 16,
-  },
-  heroButtonsContainer: {
-    paddingHorizontal: 16,
-  },
-  playButton: {
+  buttonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F5F5DC',
+    justifyContent: 'space-evenly',
+    backgroundColor: '#1E1E1E',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  smallButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smallButtonText: {
+    color: 'white',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  playButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5DC',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 6,
-    marginBottom: 12,
   },
   playButtonText: {
     color: '#111',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  smallButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  iconButton: {
-    alignItems: 'center',
-    marginLeft: 24,
-  },
-  iconButtonText: {
-    color: 'white',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  // Movie details styles
   movieInfoContainer: {
     padding: 16,
   },
@@ -561,7 +608,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  // Photo Reviews section styles
   sectionContainer: {
     marginVertical: 12,
     paddingHorizontal: 16,
@@ -589,25 +635,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 8,
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
     textAlign: 'center',
-    marginLeft: 8,
-  },
-  buttonIcon: {
-    marginRight: 8,
   },
   photosList: {
     paddingHorizontal: 8,
@@ -620,11 +660,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 8,
     overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
   },
   photoThumbnail: {
     width: '100%',
@@ -648,7 +683,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
   },
-  // Write a Review section styles
   reviewInputContainer: {
     padding: 16,
   },
@@ -680,6 +714,7 @@ const styles = StyleSheet.create({
   yourRatingText: {
     color: '#BBB',
     fontSize: 14,
+    marginBottom: 4,
   },
   postReviewButton: {
     backgroundColor: '#F5F5DC',
@@ -692,7 +727,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-  // Reviews section styles
   reviewsSection: {
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -777,7 +811,6 @@ const styles = StyleSheet.create({
     color: '#CCC',
     fontSize: 14,
   },
-  // More Like This section styles
   moreLikeThisContainer: {
     paddingTop: 8,
     paddingHorizontal: 16,
