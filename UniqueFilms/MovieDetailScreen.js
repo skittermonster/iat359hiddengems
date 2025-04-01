@@ -39,10 +39,10 @@ import {
   Image as ImageIcon,
   ArrowLeft,
 } from 'lucide-react-native';
-
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar'; // make sure this is included
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 function SimpleStarRating({ rating, setRating, maxStars = 5, small = false }) {
   const starsArray = Array.from({ length: maxStars }, (_, i) => i + 1);

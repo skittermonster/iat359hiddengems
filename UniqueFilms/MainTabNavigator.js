@@ -1,20 +1,33 @@
 // MainTabNavigator.js
-
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
 import { Home as HomeIcon, Gem, User as UserIcon } from 'lucide-react-native';
 
 import HomeScreen from './HomeScreen';
 import MyArchiveScreen from './MyArchiveScreen';
 import ProfileScreen from './ProfileScreen';
+import MovieDetailScreen from './MovieDetailScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+// 👇 Create a stack for Home + MovieDetail
+function HomeStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="HomeMain" component={HomeScreen} />
+      <Stack.Screen name="MovieDetail" component={MovieDetailScreen} />
+    </Stack.Navigator>
+  );
+}
 
 export default function MainTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ focused }) => {
           const iconColor = focused ? '#FFFFFF' : '#999999';
           const iconSize = 26;
 
@@ -49,7 +62,7 @@ export default function MainTabNavigator() {
     >
       <Tab.Screen 
         name="Home" 
-        component={HomeScreen} 
+        component={HomeStack} 
         options={{ title: 'Home' }}
       />
       <Tab.Screen 
