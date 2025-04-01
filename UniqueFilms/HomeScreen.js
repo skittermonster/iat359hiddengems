@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, Alert, ScrollView } from 'react-native';
+import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MyArchiveScreen from './MyArchiveScreen';
 import ProfileScreen from './ProfileScreen.js';
@@ -14,7 +14,6 @@ export default HomeScreen;
 
 const TMDB_API_KEY = '1102d81d4603c7d20f1fc0ba2d1b6031';
 
-
 function HomeScreen({ navigation }) {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,8 +21,10 @@ function HomeScreen({ navigation }) {
   const [userGenre, setUserGenre] = useState(null);
   const [favoriteMovies, setFavoriteMovies] = useState({});
   const [featuredMovie, setFeaturedMovie] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  // Use an array for multi-select instead of a single value.
+  const [selectedGenres, setSelectedGenres] = useState([]);
 
+  // Fetch user data (including the default/preferred genre)
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -51,12 +52,47 @@ function HomeScreen({ navigation }) {
     fetchUserData();
   }, []);
 
+  // Update the movie fetching logic to use multiple selected genres.
   useEffect(() => {
     const fetchMovies = async () => {
-      if (!userGenre) return;
       setLoading(true);
       try {
-        const genreFilter = `&with_genres=${userGenre.id}`;
+        let genreFilter = '';
+        // If one or more genres are selected, build the filter.
+        if (selectedGenres.length > 0) {
+          // Map the displayed genre names to TMDB genre IDs.
+          const genreMapping = {
+            'Action': 28,
+            'Adventure': 12,
+            'Animation': 16,
+            'Comedy': 35,
+            'Crime': 80,
+            'Documentary': 99,
+            'Drama': 18,
+            'Family': 10751,
+            'Fantasy': 14,
+            'History': 36,
+            'Horror': 27,
+            'Music': 10402,
+            'Mystery': 9648,
+            'Romance': 10749,
+            'Science Fiction': 878,
+            'TV Movie': 10770,
+            'Thriller': 53,
+            'War': 10752,
+            'Western': 37,
+          };
+          const selectedIds = selectedGenres
+            .map((genre) => genreMapping[genre])
+            .filter(Boolean)
+            .join(',');
+          if (selectedIds) {
+            genreFilter = `&with_genres=${selectedIds}`;
+          }
+        } else if (userGenre) {
+          // No genres selected: fallback to the user's default genre.
+          genreFilter = `&with_genres=${userGenre.id}`;
+        }
         const response = await fetch(
           `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}${genreFilter}&sort_by=vote_average.desc&vote_count.gte=50&vote_count.lte=1000&page=1`
         );
@@ -76,8 +112,9 @@ function HomeScreen({ navigation }) {
       }
     };
     fetchMovies();
-  }, [userGenre]);
+  }, [userGenre, selectedGenres]);
 
+  // Toggle favorite functionality remains unchanged.
   const toggleFavorite = async (movie) => {
     try {
       const userId = auth.currentUser?.uid;
@@ -119,6 +156,20 @@ function HomeScreen({ navigation }) {
     }
   };
 
+  // Handler for genre button presses for multi-select.
+  const handleGenrePress = (genre) => {
+    if (genre === 'All') {
+      // "All" resets the filter.
+      setSelectedGenres([]);
+    } else {
+      if (selectedGenres.includes(genre)) {
+        setSelectedGenres(selectedGenres.filter((g) => g !== genre));
+      } else {
+        setSelectedGenres([...selectedGenres, genre]);
+      }
+    }
+  };
+
   const renderMovie = ({ item }) => {
     const isFavorite = favoriteMovies[item.id.toString()];
     return (
@@ -153,14 +204,12 @@ function HomeScreen({ navigation }) {
             />
           </TouchableOpacity>
         </View>
-  
-        {/* Bottom white section */}
         <View style={styles.movieInfo}>
           <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">{item.title}</Text>
           <View style={styles.ratingContainer}>
-  <Text style={styles.star}>★</Text>
-  <Text style={styles.rating}>{item.vote_average.toFixed(1)}</Text>
-</View>
+            <Text style={styles.star}>★</Text>
+            <Text style={styles.rating}>{item.vote_average.toFixed(1)}</Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -169,14 +218,12 @@ function HomeScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: '#181820' }}>
       <StatusBar style="light" translucent backgroundColor="transparent" />
-  
       <LinearGradient colors={['#585858', '#181820']} style={styles.logoHeader}>
         <Text style={styles.logo}>GEM</Text>
         <TouchableOpacity style={styles.searchIcon}>
           <Search color="#fff" size={22} />
         </TouchableOpacity>
       </LinearGradient>
-  
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.moviesContainer}>
           <Text style={styles.sectionTitle}>Gems You May Like</Text>
@@ -188,25 +235,25 @@ function HomeScreen({ navigation }) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.moviesList}
           />
-  
           <Text style={styles.sectionTitle}>Categories</Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
             contentContainerStyle={styles.genreScroll}
           >
-            {['All', 'Romance', 'Horror', 'Action', 'Animation'].map((genre) => (
-  <TouchableOpacity
-    key={genre}
-    style={[
-      styles.genreButton,
-      selectedCategory === genre && styles.selectedGenreButton, // 👈 Apply highlight style if selected
-    ]}
-    onPress={() => setSelectedCategory(genre)}
-  >
-    <Text style={styles.genreText}>{genre}</Text>
-  </TouchableOpacity>
-))}
+            {['All', 'Romance', 'Horror', 'Action', 'Animation'].map((genre) => {
+              // "All" is highlighted if no genre is selected.
+              const isSelected = genre === 'All' ? selectedGenres.length === 0 : selectedGenres.includes(genre);
+              return (
+                <TouchableOpacity
+                  key={genre}
+                  style={[styles.genreButton, isSelected && styles.selectedGenreButton]}
+                  onPress={() => handleGenrePress(genre)}
+                >
+                  <Text style={styles.genreText}>{genre}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
           <FlatList
             data={movies}
@@ -231,7 +278,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between', // ensures logo left, icon right
+    justifyContent: 'space-between',
   },
   logoGlow: {
     position: 'absolute',
@@ -265,7 +312,7 @@ const styles = StyleSheet.create({
   genreScroll: {
     paddingHorizontal: 20,
     gap: 10,
-    marginBottom: 20, // 👈 This adds space below the category buttons
+    marginBottom: 20,
   },
   genreGrid: {
     flexDirection: 'row',
@@ -283,12 +330,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   selectedGenreButton: {
-    backgroundColor: '#FFFFFF33', // white at 20% opacity
+    backgroundColor: '#FFFFFF33',
   },
   genreText: {
     color: 'white',
     fontSize: 14,
-    fontFamily: 'Mada', // or default
+    fontFamily: 'Mada',
   },
   moviesContainer: { paddingTop: 8 },
   moviesList: { 
@@ -300,7 +347,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     backgroundColor: '#fff',
     borderRadius: 20,
-    overflow: 'visible', // allow icon overflow
+    overflow: 'visible',
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -328,9 +375,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '500',
-    marginTop:2,
-    marginLeft:3,
-    marginBottom: 23, // push space to fit rating
+    marginTop: 2,
+    marginLeft: 3,
+    marginBottom: 23,
     color: '#000',
   },
   ratingContainer: {
@@ -339,9 +386,8 @@ const styles = StyleSheet.create({
     bottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft:3,
+    marginLeft: 3,
   },
-  
   rating: {
     fontSize: 14,
     fontWeight: '600',
@@ -349,23 +395,20 @@ const styles = StyleSheet.create({
   },
   star: {
     fontSize: 14,
-    color: '#FFD700', // yellow
+    color: '#FFD700',
     marginRight: 2,
   },
-
   favoriteButton: {
     position: 'absolute',
-    bottom: 0,  // 👈 now at bottom of poster
+    bottom: 0,
     right: 0,
     zIndex: 10,
   },
-
   favoriteIcon: {
     width: 55,
     height: 55,
     resizeMode: 'contain',
   },
-  
   loadingText: { marginTop: 10, color: '#666', fontSize: 16 },
   errorText: { color: 'red', textAlign: 'center', fontSize: 16 },
   noMoviesText: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 20 },
