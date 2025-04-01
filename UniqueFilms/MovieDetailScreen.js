@@ -29,7 +29,7 @@ import {
 // Icons
 import {
   Search,
-  Play,
+  Gem,
   Check,
   Share2,
   Star as StarIcon,
@@ -37,12 +37,11 @@ import {
   ThumbsDown,
   Camera,
   Image as ImageIcon,
-  ArrowLeft,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar'; // make sure this is included
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import LineDivider from './assets/Line 3.png';
 
 function SimpleStarRating({ rating, setRating, maxStars = 5, small = false }) {
   const starsArray = Array.from({ length: maxStars }, (_, i) => i + 1);
@@ -376,32 +375,41 @@ export default function MovieDetailScreen({ route }) {
 
         {/* Button Row BELOW the poster */}
         <View style={styles.buttonRow}>
-          {/* Archive */}
-          <TouchableOpacity style={styles.smallButton} onPress={handleToggleFavorite}>
-            <Check size={20} color="white" />
-            <Text style={styles.smallButtonText}>
-              {isFavorite ? 'Archived' : 'Archive'}
-            </Text>
-          </TouchableOpacity>
+  {/* Left-aligned Play button */}
+  <TouchableOpacity
+  style={styles.playButtonRow}
+  onPress={() => Alert.alert('Play', 'Play button tapped!')}
+>
+  <Image
+    source={require('./assets/Play.png')}
+    style={styles.playIcon}
+  />
+  <Text style={styles.playButtonText}>Play</Text>
+</TouchableOpacity>
 
-          {/* Play */}
-          <TouchableOpacity
-            style={styles.playButtonRow}
-            onPress={() => Alert.alert('Play', 'Play button tapped!')}
-          >
-            <Play size={20} color="#111" style={{ marginRight: 6 }} />
-            <Text style={styles.playButtonText}>Play</Text>
-          </TouchableOpacity>
+  {/* Right-aligned Archive and Share buttons in a column */}
+  <View style={styles.rightButtons}>
+    <TouchableOpacity style={styles.smallButton} onPress={handleToggleFavorite}>
+    {isFavorite ? (
+    <Check size={26} color="#FFF1D4" />
+  ) : (
+    <Gem size={25} color="#FFFFFF" />
+  )}
+      <Text
+    style={[styles.smallButtonText, isFavorite && { color: '#FFF1D4' }]}>
+    {isFavorite ? 'Archived' : 'Archive'}
+  </Text>
+</TouchableOpacity>
 
-          {/* Share */}
-          <TouchableOpacity
-            style={styles.smallButton}
-            onPress={() => Alert.alert('Share', 'Share this movie')}
-          >
-            <Share2 size={20} color="white" />
-            <Text style={styles.smallButtonText}>Share</Text>
-          </TouchableOpacity>
-        </View>
+    <TouchableOpacity
+      style={styles.smallButton}
+      onPress={() => Alert.alert('Share', 'Share this movie')}
+    >
+      <Share2 size={24} color="white" />
+      <Text style={styles.smallButtonText}>Share</Text>
+    </TouchableOpacity>
+  </View>
+</View>
 
         {/* Movie Info */}
         <View style={styles.movieInfoContainer}>
@@ -416,19 +424,26 @@ export default function MovieDetailScreen({ route }) {
           </View>
           <Text style={styles.movieOverview}>{movieDetails.overview}</Text>
         </View>
+        <Image
+  source={LineDivider}
+  style={styles.lineDivider}
+/>
 
         {/* Photo Reviews */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Photo Reviews</Text>
-            <TouchableOpacity style={styles.viewAllButton} onPress={() => Alert.alert('All Photos')}>
-              <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
+            <TouchableOpacity
+  style={styles.showMoreButton}
+  onPress={() => Alert.alert('All Photos')}
+>
+  <Text style={styles.showMoreButtonText}>View All</Text>
+</TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.cameraButton} onPress={captureImage} activeOpacity={0.7}>
-            <Camera size={20} color="white" style={styles.buttonIcon} />
-            <Text style={styles.buttonText}>Add Photo Review</Text>
-          </TouchableOpacity>
+  <Camera size={20} color="black" style={styles.buttonIcon} />
+  <Text style={[styles.buttonText, { color: 'black' }]}>Add Photo Review</Text>
+</TouchableOpacity>
           {userPhotos.length > 0 ? (
             <FlatList
               data={userPhotos.slice(0, 5)}
@@ -450,7 +465,7 @@ export default function MovieDetailScreen({ route }) {
 
         {/* Write a Review */}
         <View style={styles.reviewInputContainer}>
-          <Text style={styles.writeReviewTitle}>Write A Review</Text>
+          <Text style={styles.writeReviewTitle}>Written Reviews</Text>
           <TextInput
             style={styles.reviewInput}
             placeholder="Share your thoughts about the movie..."
@@ -491,19 +506,6 @@ export default function MovieDetailScreen({ route }) {
             <Text style={styles.showMoreButtonText}>Show More</Text>
           </TouchableOpacity>
         </View>
-
-        {/* More Like This */}
-        <View style={styles.moreLikeThisContainer}>
-          <Text style={styles.moreLikeThisTitle}>More Like This</Text>
-          <FlatList
-            data={moreLikeThisData}
-            keyExtractor={(item) => item.id}
-            renderItem={renderSimilarMovie}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingLeft: 4 }}
-          />
-        </View>
       </ScrollView>
       </View>
   );
@@ -536,63 +538,87 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
     marginRight: 5,
   },
-  navBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(30, 30, 30, 0.9)',
-  },
   backIcon: {
     padding: 4,
     marginRight: 8,
   },
-  navTitle: {
-    color: 'white',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  searchIcon: {
-    padding: 4,
-  },
   contentContainer: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#181820',
   },
   heroImage: {
     width: '100%',
     height: 220,
   },
   buttonRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  marginTop: 12,
+  marginBottom: 10,
+  gap: 16, // optional for extra space between Play and Right Buttons
+},
+smallButton: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 6,
+  paddingHorizontal: 8,
+},
+smallButtonText: {
+  color: 'white',
+  fontSize: 14, // previously 12
+  marginTop: 6, // more breathing space
+},
+  playButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-evenly',
-    backgroundColor: '#1E1E1E',
-    paddingVertical: 12,
-    marginBottom: 8,
+    backgroundColor: '#F5F5DC',
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+    borderRadius: 10,
   },
-  smallButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  smallButtonText: {
-    color: 'white',
-    fontSize: 12,
-    marginTop: 4,
+  
+  playButtonLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#181820',
   },
   playButtonRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F5DC',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 6,
+    paddingVertical: 11,
+    paddingHorizontal:70,
+    borderRadius: 5,
+    justifyContent: 'center',
+  },
+  rightButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 12, // reduces space between Archive & Share
+    marginRight: 6, // moves the group slightly to the left
+  },
+  
+  iconButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  iconButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  playIcon: {
+    width: 18,
+    height: 18,
+    marginRight: 6,
+    resizeMode: 'contain',
   },
   playButtonText: {
     color: '#111',
     fontSize: 16,
-    fontWeight: 'bold',
   },
   movieInfoContainer: {
     padding: 16,
@@ -602,6 +628,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 8,
+    fontFamily:'Righteous',
   },
   ratingRow: {
     flexDirection: 'row',
@@ -609,9 +636,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   movieRating: {
-    color: '#FFD700',
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: 'bold',
     marginLeft: 4,
     marginRight: 6,
   },
@@ -620,16 +646,16 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   movieRuntime: {
-    color: '#888',
+    color: '#FFFFFF',
     fontSize: 14,
   },
   movieOverview: {
-    color: '#CCC',
+    color: 'rgba(255, 255, 255, 0.87)',
     fontSize: 14,
     lineHeight: 20,
   },
   sectionContainer: {
-    marginVertical: 12,
+    marginVertical: 40,
     paddingHorizontal: 16,
   },
   sectionHeaderRow: {
@@ -642,6 +668,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+    fontFamily:'Righteous'
   },
   viewAllButton: {
     padding: 8,
@@ -651,7 +678,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   cameraButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#F2EFD0',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -665,7 +692,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    fontWeight: 'bold',
     fontSize: 16,
     textAlign: 'center',
   },
@@ -711,13 +737,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 12,
+    fontFamily:'Righteous'
   },
   reviewInput: {
-    backgroundColor: '#222',
-    color: 'white',
+    backgroundColor: '#fff',   // white box
+    color: '#000',             // black text
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#999',       
     padding: 12,
     minHeight: 80,
     textAlignVertical: 'top',
@@ -756,11 +783,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    fontFamily:'Righteous',
   },
   reviewSectionTitle: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+    fontFamily:'Righteous'
   },
   reviewSectionRating: {
     color: '#FFD700',
@@ -831,41 +860,13 @@ const styles = StyleSheet.create({
     color: '#CCC',
     fontSize: 14,
   },
-  moreLikeThisContainer: {
-    paddingTop: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-  },
-  moreLikeThisTitle: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  similarMovieCard: {
-    width: 120,
-    marginRight: 12,
-  },
-  similarPoster: {
-    width: 120,
-    height: 180,
-    borderRadius: 8,
-    backgroundColor: '#333',
-    marginBottom: 6,
-  },
-  similarTitle: {
-    color: 'white',
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  smallRatingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  smallRatingText: {
-    color: '#FFD700',
-    fontSize: 12,
-    marginLeft: 2,
+  lineDivider: {
+    width: '100%', // wider than before (you can try '95%' or '100%' too)
+    height: 4,
+    resizeMode: 'contain',
+    marginTop: 20,
+    alignSelf: 'center', // centers the image horizontally
   },
 });
+
 
