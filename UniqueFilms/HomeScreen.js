@@ -1,3 +1,5 @@
+// homescreen.js
+
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,13 +17,13 @@ export default HomeScreen;
 const TMDB_API_KEY = '1102d81d4603c7d20f1fc0ba2d1b6031';
 
 function HomeScreen({ navigation }) {
-  const [movies, setMovies] = useState([]);
+  const [defaultMovies, setDefaultMovies] = useState([]); // movies based solely on the user's default genre
+  const [filteredMovies, setFilteredMovies] = useState([]); // movies that change when categories are selected
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userGenre, setUserGenre] = useState(null);
   const [favoriteMovies, setFavoriteMovies] = useState({});
   const [featuredMovie, setFeaturedMovie] = useState(null);
-  // Use an array for multi-select instead of a single value.
   const [selectedGenres, setSelectedGenres] = useState([]);
 
   // Fetch user data (including the default/preferred genre)
@@ -52,15 +54,40 @@ function HomeScreen({ navigation }) {
     fetchUserData();
   }, []);
 
-  // Update the movie fetching logic to use multiple selected genres.
+  // Fetch default movies based on the user's onboarded preference.
+  // This list is used for the "Gems You May Like" section and remains unchanged.
   useEffect(() => {
-    const fetchMovies = async () => {
+    const fetchDefaultMovies = async () => {
+      if (!userGenre) return;
+      try {
+        const genreFilter = `&with_genres=${userGenre.id}`;
+        const response = await fetch(
+          `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}${genreFilter}&sort_by=vote_average.desc&vote_count.gte=50&vote_count.lte=1000&page=1`
+        );
+        if (!response.ok) throw new Error('Network error');
+        const data = await response.json();
+        if (data.results && data.results.length > 0) {
+          setDefaultMovies(data.results);
+          setFeaturedMovie(data.results[Math.floor(Math.random() * data.results.length)]);
+        } else {
+          setError('No movies found for your preference');
+        }
+      } catch (err) {
+        console.error('Error fetching default movies:', err);
+        setError(err.message);
+      }
+    };
+    fetchDefaultMovies();
+  }, [userGenre]);
+
+  // Fetch movies based on the selected category filters.
+  // These movies update whenever the user selects a new category.
+  useEffect(() => {
+    const fetchFilteredMovies = async () => {
       setLoading(true);
       try {
         let genreFilter = '';
-        // If one or more genres are selected, build the filter.
         if (selectedGenres.length > 0) {
-          // Map the displayed genre names to TMDB genre IDs.
           const genreMapping = {
             'Action': 28,
             'Adventure': 12,
@@ -89,9 +116,6 @@ function HomeScreen({ navigation }) {
           if (selectedIds) {
             genreFilter = `&with_genres=${selectedIds}`;
           }
-        } else if (userGenre) {
-          // No genres selected: fallback to the user's default genre.
-          genreFilter = `&with_genres=${userGenre.id}`;
         }
         const response = await fetch(
           `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}${genreFilter}&sort_by=vote_average.desc&vote_count.gte=50&vote_count.lte=1000&page=1`
@@ -99,20 +123,19 @@ function HomeScreen({ navigation }) {
         if (!response.ok) throw new Error('Network response was not ok');
         const data = await response.json();
         if (data.results && data.results.length > 0) {
-          setMovies(data.results);
-          setFeaturedMovie(data.results[Math.floor(Math.random() * data.results.length)]);
+          setFilteredMovies(data.results);
         } else {
-          setError('No movies found matching your preferences');
+          setError('No movies found for selected categories');
         }
       } catch (err) {
-        console.error('Error fetching movies:', err);
+        console.error('Error fetching filtered movies:', err);
         setError(`Failed to load movies: ${err.message}`);
       } finally {
         setLoading(false);
       }
     };
-    fetchMovies();
-  }, [userGenre, selectedGenres]);
+    fetchFilteredMovies();
+  }, [selectedGenres]);
 
   // Toggle favorite functionality remains unchanged.
   const toggleFavorite = async (movie) => {
@@ -226,15 +249,17 @@ function HomeScreen({ navigation }) {
       </LinearGradient>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.moviesContainer}>
+          {/* Gems You May Like section uses defaultMovies */}
           <Text style={styles.sectionTitle}>Gems You May Like</Text>
           <FlatList
-            data={movies.slice(0, 10)}
+            data={defaultMovies.slice(0, 10)}
             renderItem={renderMovie}
             keyExtractor={(item) => `new_${item.id}`}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.moviesList}
           />
+          {/* Categories Section */}
           <Text style={styles.sectionTitle}>Categories</Text>
           <ScrollView 
             horizontal 
@@ -255,8 +280,9 @@ function HomeScreen({ navigation }) {
               );
             })}
           </ScrollView>
+          {/* Filtered movies list updates when categories change */}
           <FlatList
-            data={movies}
+            data={filteredMovies}
             renderItem={renderMovie}
             keyExtractor={(item) => item.id.toString()}
             horizontal
@@ -413,3 +439,4 @@ const styles = StyleSheet.create({
   errorText: { color: 'red', textAlign: 'center', fontSize: 16 },
   noMoviesText: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 20 },
 });
+
