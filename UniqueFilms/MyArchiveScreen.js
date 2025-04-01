@@ -22,6 +22,9 @@ import {
 // Example icons from lucide-react-native
 // You can replace them with your own icons if you prefer
 import { BookmarkCheck, Trash2, Play, Star } from 'lucide-react-native';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native';
 
 export default function MyArchiveScreen({ navigation }) {
   const [archivedMovies, setArchivedMovies] = useState([]);
@@ -176,12 +179,12 @@ export default function MyArchiveScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
-
-      {/* Top Header */}
-      <View style={styles.header}>
-        <Text style={styles.logoText}>GEM</Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: '#181820' }}>
+  <StatusBar style="light" translucent backgroundColor="transparent" />
+  <LinearGradient colors={['#585858', '#181820']} style={styles.logoHeader}>
+    <Text style={styles.logo}>GEM</Text>
+  </LinearGradient>
+    
 
       {/* Sub-header */}
       <Text style={styles.archivedTitle}>Archived Gems</Text>
@@ -211,6 +214,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#121212', // or #000
     paddingTop: 40, // for status bar spacing if needed
+  },
+  logoHeader: {
+    paddingTop: 70,  // key for spacing under translucent status bar
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  logo: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontFamily: 'Lato',
   },
   // Header area (where "GEM" sits)
   header: {

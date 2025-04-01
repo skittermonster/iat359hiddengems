@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { auth, db } from './firebase'; 
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
 export default function ProfileScreen({ navigation }) {
   const [user, setUser] = useState(null);
@@ -145,12 +147,12 @@ export default function ProfileScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Top bar with "GEM" and a search icon */}
-      <View style={styles.topBar}>
-        <Text style={styles.logo}>GEM</Text>
-        <Ionicons name="search" size={24} color="#fff" />
-      </View>
+    <View style={{ flex: 1, backgroundColor: '#181820' }}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+  
+  <LinearGradient colors={['#585858', '#181820']} style={styles.logoHeader}>
+          <Text style={styles.logo}>GEM</Text>
+  </LinearGradient>
 
       {/* Profile Header Section */}
       <View style={styles.profileHeaderRow}>
@@ -268,10 +270,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#181818',
   },
-  logo: {
-    color: '#fff',
-    fontSize: 28,
+  logoHeader: {
+    paddingTop: 70,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  
+  logoGlow: {
+    position: 'absolute',
+    fontSize: 32,
     fontWeight: 'bold',
+    color: '#FFFFFF',
+    textShadowColor: '#FFFFFF',
+    textShadowRadius: 7,
+    zIndex: 0,
+    fontFamily: 'Lato',
+  },
+  
+  logo: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    zIndex: 1,
+    fontFamily: 'Lato',
   },
   /***** PROFILE HEADER ROW *****/
   profileHeaderRow: {
@@ -295,12 +319,13 @@ const styles = StyleSheet.create({
   },
   userName: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
+    fontFamily:'Righteous',
   },
   userEmail: {
     color: '#ccc',
-    fontSize: 14,
+    fontSize: 15,
     marginTop: 4,
   },
   editUserNameContainer: {
@@ -356,10 +381,10 @@ const styles = StyleSheet.create({
   /***** SETTINGS *****/
   settingsContainer: {
     backgroundColor: '#1F1F1F',
-    marginHorizontal: 16,
-    borderRadius: 12,
+    marginHorizontal: 33,
+    borderRadius: 15,
     padding: 16,
-    marginTop: 20,
+    marginTop: 60,
     borderWidth: 1,
     borderColor: '#F4ECC3',
   },
@@ -387,7 +412,7 @@ const styles = StyleSheet.create({
   },
   /***** SIGN OUT *****/
   signOutButton: {
-    marginTop: 15,
+    marginTop: 30, 
     alignSelf: 'center',
     backgroundColor: '#F4ECC3',
     paddingHorizontal: 24,

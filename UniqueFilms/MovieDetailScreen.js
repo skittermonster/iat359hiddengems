@@ -1,5 +1,3 @@
-// details screen 
-
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
   SafeAreaView,
@@ -43,6 +41,8 @@ import {
 } from 'lucide-react-native';
 
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar'; // make sure this is included
 
 function SimpleStarRating({ rating, setRating, maxStars = 5, small = false }) {
   const starsArray = Array.from({ length: maxStars }, (_, i) => i + 1);
@@ -352,29 +352,27 @@ export default function MovieDetailScreen({ route }) {
   }
 
   return (
-    <SafeAreaView style={styles.screenContainer}>
-      {/* Custom Top Bar */}
-      <View style={styles.navBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIcon}>
-          <ArrowLeft size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>GEM</Text>
-        <TouchableOpacity style={styles.searchIcon}>
-          <Search size={24} color="white" />
-        </TouchableOpacity>
-      </View>
+<View style={{ flex: 1, backgroundColor: '#181820' }}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+  
+  <LinearGradient colors={['#585858', '#181820']} style={styles.logoHeader}>
+          <Text style={styles.logo}>GEM</Text>
+          <TouchableOpacity style={styles.searchIcon}>
+            <Search color="#fff" size={22} />
+          </TouchableOpacity>
+  </LinearGradient>
 
       <ScrollView style={styles.contentContainer}>
         {/* Poster/Thumbnail */}
         <ImageBackground
-          source={{
-            uri: movieDetails.poster_path
-              ? `https://image.tmdb.org/t/p/w500${movieDetails.poster_path}`
-              : 'https://via.placeholder.com/400x200',
-          }}
-          style={styles.heroImage}
-          resizeMode="cover"
-        />
+  source={{
+    uri: movieDetails?.poster_path
+      ? `https://image.tmdb.org/t/p/w500${movieDetails.poster_path}`
+      : 'https://via.placeholder.com/400x200',
+  }}
+  style={styles.heroImage}
+  resizeMode="cover"
+/>
 
         {/* Button Row BELOW the poster */}
         <View style={styles.buttonRow}>
@@ -507,14 +505,36 @@ export default function MovieDetailScreen({ route }) {
           />
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </View>
   );
 }
 
 const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: 'transparent',
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  logoHeader: {
+    paddingTop: 70,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  logo: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontFamily: 'Lato',
+  },
+  searchIcon: {
+    marginLeft: 'auto',
+    marginRight: 5,
   },
   navBar: {
     flexDirection: 'row',
