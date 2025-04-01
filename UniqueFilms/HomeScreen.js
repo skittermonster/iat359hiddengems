@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, Alert,ScrollView} from 'react-native';
+import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, Alert, ScrollView } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MyArchiveScreen from './MyArchiveScreen';
 import ProfileScreen from './ProfileScreen.js';
 import { auth, db } from './firebase';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, serverTimestamp} from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection } from 'firebase/firestore';
 import { Bookmark, BookmarkCheck } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import { Search } from 'lucide-react-native';
+
 export default HomeScreen;
 
-// TMDB API key
 const TMDB_API_KEY = '1102d81d4603c7d20f1fc0ba2d1b6031';
+
 
 function HomeScreen({ navigation }) {
   const [movies, setMovies] = useState([]);
@@ -17,8 +21,9 @@ function HomeScreen({ navigation }) {
   const [error, setError] = useState(null);
   const [userGenre, setUserGenre] = useState(null);
   const [favoriteMovies, setFavoriteMovies] = useState({});
+  const [featuredMovie, setFeaturedMovie] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
-  // Fetch user preferences and favorites
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -28,14 +33,12 @@ function HomeScreen({ navigation }) {
           setLoading(false);
           return;
         }
-        // Get user preferences
         const userDoc = await getDoc(doc(db, 'users', userId));
         if (userDoc.exists() && userDoc.data().preferredGenre) {
           setUserGenre(userDoc.data().preferredGenre);
         } else {
           setError('No genre preferences found');
         }
-        // Get user favorites
         const favoritesSnapshot = await getDoc(doc(db, 'users', userId, 'collections', 'favorites'));
         if (favoritesSnapshot.exists()) {
           setFavoriteMovies(favoritesSnapshot.data().movies || {});
@@ -53,7 +56,7 @@ function HomeScreen({ navigation }) {
       if (!userGenre) return;
       setLoading(true);
       try {
-        const genreFilter = userGenre ? `&with_genres=${userGenre.id}` : '';
+        const genreFilter = `&with_genres=${userGenre.id}`;
         const response = await fetch(
           `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}${genreFilter}&sort_by=vote_average.desc&vote_count.gte=50&vote_count.lte=1000&page=1`
         );
@@ -61,6 +64,7 @@ function HomeScreen({ navigation }) {
         const data = await response.json();
         if (data.results && data.results.length > 0) {
           setMovies(data.results);
+          setFeaturedMovie(data.results[Math.floor(Math.random() * data.results.length)]);
         } else {
           setError('No movies found matching your preferences');
         }
@@ -92,7 +96,7 @@ function HomeScreen({ navigation }) {
       if (isFavorite) {
         delete updatedFavorites[movieId];
         await deleteDoc(archiveDocRef);
-        Alert.alert('Removed', `"${movie.title}" removed from your archive`);
+        Alert.alert('Removed', `${movie.title} removed from your archive`);
       } else {
         updatedFavorites[movieId] = true;
         const movieData = {
@@ -105,7 +109,7 @@ function HomeScreen({ navigation }) {
           addedAt: new Date().toISOString()
         };
         await setDoc(archiveDocRef, movieData);
-        Alert.alert('Added', `"${movie.title}" added to your archive`);
+        Alert.alert('Added', `${movie.title} added to your archive`);
       }
       await setDoc(favoritesDocRef, { movies: updatedFavorites }, { merge: true });
       setFavoriteMovies(updatedFavorites);
@@ -122,107 +126,246 @@ function HomeScreen({ navigation }) {
         style={styles.movieCard}
         onPress={() => navigation.navigate('MovieDetail', { movie: item, isFavorite })}
       >
-        {item.poster_path ? (
-          <Image
-            source={{ uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }}
-            style={styles.poster}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.poster, styles.noPoster]}>
-            <Text style={styles.noPosterText}>No Poster</Text>
-          </View>
-        )}
-        <TouchableOpacity 
-          style={styles.favoriteButton}
-          onPress={() => toggleFavorite(item)}
-          activeOpacity={0.7}
-        >
-          {isFavorite ? (
-            <BookmarkCheck size={24} color="white" fill="#4CAF50" />
+        <View style={{ position: 'relative' }}>
+          {item.poster_path ? (
+            <Image
+              source={{ uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }}
+              style={styles.poster}
+              resizeMode="cover"
+            />
           ) : (
-            <Bookmark size={24} color="white" />
+            <View style={[styles.poster, styles.noPoster]}>
+              <Text style={styles.noPosterText}>No Poster</Text>
+            </View>
           )}
-        </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.rating}>{item.vote_average.toFixed(1)} ★</Text>
+          <TouchableOpacity 
+            style={styles.favoriteButton}
+            onPress={() => toggleFavorite(item)}
+            activeOpacity={0.7}
+          >
+            <Image
+              source={
+                isFavorite
+                  ? require('./assets/Saved.png')
+                  : require('./assets/UnSaved.png')
+              }
+              style={styles.favoriteIcon}
+            />
+          </TouchableOpacity>
+        </View>
+  
+        {/* Bottom white section */}
+        <View style={styles.movieInfo}>
+          <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">{item.title}</Text>
+          <View style={styles.ratingContainer}>
+  <Text style={styles.star}>★</Text>
+  <Text style={styles.rating}>{item.vote_average.toFixed(1)}</Text>
+</View>
+        </View>
       </TouchableOpacity>
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text style={styles.loadingText}>Discovering hidden gems...</Text>
-      </View>
-    );
-  }
-  if (error) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
-    );
-  }
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Hidden Gems Cinema</Text>
-        {userGenre && (
-          <Text style={styles.subtitle}>Discovering {userGenre.name} gems for you</Text>
-        )}
-      </View>
+    <View style={{ flex: 1, backgroundColor: '#181820' }}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+  
+      <LinearGradient colors={['#585858', '#181820']} style={styles.logoHeader}>
+        <Text style={styles.logo}>GEM</Text>
+        <TouchableOpacity style={styles.searchIcon}>
+          <Search color="#fff" size={22} />
+        </TouchableOpacity>
+      </LinearGradient>
+  
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Movies Section */}
-        {movies.length > 0 ? (
-          <View style={styles.moviesContainer}>
-            <Text style={styles.sectionTitle}>Recommended Hidden Gems</Text>
-            <FlatList
-              data={movies}
-              renderItem={renderMovie}
-              keyExtractor={(item) => item.id.toString()}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.moviesList}
-            />
-            <Text style={styles.sectionTitle}>Critically Acclaimed</Text>
-            <FlatList
-              data={[...movies].sort((a, b) => b.vote_average - a.vote_average).slice(0, 10)}
-              renderItem={renderMovie}
-              keyExtractor={(item) => `top_${item.id}`}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.moviesList}
-            />
-          </View>
-        ) : (
-          <View style={styles.centerContainer}>
-            <Text style={styles.noMoviesText}>No movies found. Try adjusting your preferences.</Text>
-          </View>
-        )}
+        <View style={styles.moviesContainer}>
+          <Text style={styles.sectionTitle}>Gems You May Like</Text>
+          <FlatList
+            data={movies.slice(0, 10)}
+            renderItem={renderMovie}
+            keyExtractor={(item) => `new_${item.id}`}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.moviesList}
+          />
+  
+          <Text style={styles.sectionTitle}>Categories</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.genreScroll}
+          >
+            {['All', 'Romance', 'Horror', 'Action', 'Animation'].map((genre) => (
+  <TouchableOpacity
+    key={genre}
+    style={[
+      styles.genreButton,
+      selectedCategory === genre && styles.selectedGenreButton, // 👈 Apply highlight style if selected
+    ]}
+    onPress={() => setSelectedCategory(genre)}
+  >
+    <Text style={styles.genreText}>{genre}</Text>
+  </TouchableOpacity>
+))}
+          </ScrollView>
+          <FlatList
+            data={movies}
+            renderItem={renderMovie}
+            keyExtractor={(item) => item.id.toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.moviesList}
+          />
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#181820' },
   scrollContainer: { flex: 1 },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, minHeight: 200 },
-  header: { padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#333' },
-  subtitle: { fontSize: 16, color: '#666', marginTop: 4 },
+  logoHeader: {
+    paddingTop: 70,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between', // ensures logo left, icon right
+  },
+  logoGlow: {
+    position: 'absolute',
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textShadowColor: '#FFFFFF',
+    textShadowRadius: 7,
+    zIndex: 0,
+    fontFamily: 'Lato',
+  },
+  logo: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    zIndex: 1,
+    fontFamily: 'Lato',
+  },
+  searchIcon: {
+    marginLeft: 'auto',
+    marginRight: 5,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    color: '#F2EFD0',
+    fontFamily: 'Righteous',
+    marginTop: 25,
+    marginBottom: 10,
+    paddingHorizontal: 20,
+  },
+  genreScroll: {
+    paddingHorizontal: 20,
+    gap: 10,
+    marginBottom: 20, // 👈 This adds space below the category buttons
+  },
+  genreGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 20,
+    gap: 10,
+    marginBottom: 40,
+  },
+  genreButton: {
+    borderWidth: 1,
+    borderColor: '#F2EFD0',
+    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+  },
+  selectedGenreButton: {
+    backgroundColor: '#FFFFFF33', // white at 20% opacity
+  },
+  genreText: {
+    color: 'white',
+    fontSize: 14,
+    fontFamily: 'Mada', // or default
+  },
   moviesContainer: { paddingTop: 8 },
-  moviesList: { paddingHorizontal: 8, paddingBottom: 16 },
-  movieCard: { width: 140, marginHorizontal: 8, backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
-  poster: { width: '100%', height: 200, backgroundColor: '#ddd' },
+  moviesList: { 
+    paddingHorizontal: 8, 
+    paddingBottom: 16 
+  },
+  movieCard: {
+    width: 150,
+    marginHorizontal: 8,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    overflow: 'visible', // allow icon overflow
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  movieInfo: {
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    paddingBottom: 8,
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    position: 'relative',
+  },
+  poster: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#ddd',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
   noPoster: { justifyContent: 'center', alignItems: 'center' },
   noPosterText: { color: '#888' },
-  title: { fontSize: 14, fontWeight: 'bold', padding: 8, height: 60 },
-  rating: { position: 'absolute', right: 8, top: 8, backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff', padding: 4, borderRadius: 4, fontSize: 12, fontWeight: 'bold' },
-  favoriteButton: { position: 'absolute', right: 8, bottom: 70, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 6, zIndex: 10 },
+  title: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop:2,
+    marginLeft:3,
+    marginBottom: 23, // push space to fit rating
+    color: '#000',
+  },
+  ratingContainer: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft:3,
+  },
+  
+  rating: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ACABAB',
+  },
+  star: {
+    fontSize: 14,
+    color: '#FFD700', // yellow
+    marginRight: 2,
+  },
+
+  favoriteButton: {
+    position: 'absolute',
+    bottom: 0,  // 👈 now at bottom of poster
+    right: 0,
+    zIndex: 10,
+  },
+
+  favoriteIcon: {
+    width: 55,
+    height: 55,
+    resizeMode: 'contain',
+  },
+  
   loadingText: { marginTop: 10, color: '#666', fontSize: 16 },
   errorText: { color: 'red', textAlign: 'center', fontSize: 16 },
   noMoviesText: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 20 },
