@@ -7,8 +7,9 @@ import {
   Image, 
   StyleSheet, 
   ActivityIndicator, 
-  Alert 
+  Alert
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { auth, db } from './firebase';
 import { 
   collection, 
@@ -16,15 +17,11 @@ import {
   doc, 
   deleteDoc, 
   getDoc, 
-  setDoc 
+  setDoc
 } from 'firebase/firestore';
-
-// Example icons from lucide-react-native
-// You can replace them with your own icons if you prefer
-import { BookmarkCheck, Trash2, Play, Star } from 'lucide-react-native';
+import { Trash2, Play, Star } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native';
 
 export default function MyArchiveScreen({ navigation }) {
   const [archivedMovies, setArchivedMovies] = useState([]);
@@ -38,19 +35,17 @@ export default function MyArchiveScreen({ navigation }) {
       setLoading(false);
       return;
     }
-    
+
     const userId = auth.currentUser.uid;
-    
+
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Load user favorites
         const favoritesSnapshot = await getDoc(doc(db, 'users', userId, 'collections', 'favorites'));
         if (favoritesSnapshot.exists()) {
           setFavoriteMovies(favoritesSnapshot.data().movies || {});
         }
-        
-        // Listen to archive changes
+
         const archivesRef = collection(db, 'archives', userId, 'movies');
         const unsubscribe = onSnapshot(
           archivesRef,
@@ -59,7 +54,6 @@ export default function MyArchiveScreen({ navigation }) {
             querySnapshot.forEach((doc) => {
               movies.push({ id: doc.id, ...doc.data() });
             });
-            // Sort movies by date added (newest first)
             movies.sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
             setArchivedMovies(movies);
             setLoading(false);
@@ -77,7 +71,7 @@ export default function MyArchiveScreen({ navigation }) {
         setLoading(false);
       }
     };
-    
+
     const unsubscribe = fetchData();
     return () => {
       if (typeof unsubscribe === 'function') {
@@ -86,7 +80,6 @@ export default function MyArchiveScreen({ navigation }) {
     };
   }, []);
 
-  // Remove movie from archive (trash icon)
   const removeFromArchive = async (movie) => {
     try {
       const userId = auth.currentUser?.uid;
@@ -98,15 +91,13 @@ export default function MyArchiveScreen({ navigation }) {
       const favoritesDocRef = doc(db, 'users', userId, 'collections', 'favorites');
       const archiveDocRef = doc(db, 'archives', userId, 'movies', movieId);
 
-      // Remove from local favorites object
       const updatedFavorites = { ...favoriteMovies };
       delete updatedFavorites[movieId];
 
-      // Remove from archive and update favorites
       await deleteDoc(archiveDocRef);
       await setDoc(favoritesDocRef, { movies: updatedFavorites }, { merge: true });
       setFavoriteMovies(updatedFavorites);
-      
+
       Alert.alert('Removed', `"${movie.title}" removed from your archive`);
     } catch (err) {
       console.error('Error removing from archive:', err);
@@ -114,52 +105,36 @@ export default function MyArchiveScreen({ navigation }) {
     }
   };
 
-  // Example "play" action
   const handlePlay = (movie) => {
     Alert.alert('Play', `Playing "${movie.title}"...`);
-    // or navigate to your player screen
   };
 
-  const renderMovie = ({ item, index }) => {
-    // If you specifically want the first item to have a trash icon
-    // and the rest to have a play icon (like your screenshot),
-    // you can do something like:
-    const showTrashIcon = index === 0; // or any other condition you prefer
+  const renderRightActions = (item) => (
+    <TouchableOpacity style={styles.trashAction} onPress={() => removeFromArchive(item)}>
+      <Trash2 size={24} color="#FFF" />
+    </TouchableOpacity>
+  );
 
-    return (
+  const renderMovie = ({ item }) => (
+    <Swipeable renderRightActions={() => renderRightActions(item)}>
       <View style={styles.itemContainer}>
-        {/* Poster / thumbnail */}
         <Image
           source={{ uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }}
           style={styles.poster}
         />
-        
-        {/* Title & Rating */}
         <View style={styles.infoContainer}>
           <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
           <View style={styles.ratingContainer}>
             <Star size={16} color="#FFC107" fill="#FFC107" />
-            <Text style={styles.ratingText}>
-              {item.vote_average?.toFixed(1) || 'N/A'}
-            </Text>
+            <Text style={styles.ratingText}>{item.vote_average?.toFixed(1) || 'N/A'}</Text>
           </View>
         </View>
-
-        {/* Icon on the right */}
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => showTrashIcon ? removeFromArchive(item) : handlePlay(item)}
-          activeOpacity={0.7}
-        >
-          {showTrashIcon ? (
-            <Trash2 size={24} color="#FFFFFF" />
-          ) : (
-            <Play size={24} color="#FFFFFF" />
-          )}
+        <TouchableOpacity style={styles.iconButton} onPress={() => handlePlay(item)}>
+          <Play size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
-    );
-  };
+    </Swipeable>
+  );
 
   if (loading) {
     return (
@@ -180,13 +155,11 @@ export default function MyArchiveScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#181820' }}>
-  <StatusBar style="light" translucent backgroundColor="transparent" />
-  <LinearGradient colors={['#585858', '#181820']} style={styles.logoHeader}>
-    <Text style={styles.logo}>GEM</Text>
-  </LinearGradient>
-    
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+      <LinearGradient colors={['#585858', '#181820']} style={styles.logoHeader}>
+        <Text style={styles.logo}>GEM</Text>
+      </LinearGradient>
 
-      {/* Sub-header */}
       <Text style={styles.archivedTitle}>Archived Gems</Text>
 
       {archivedMovies.length > 0 ? (
@@ -209,14 +182,8 @@ export default function MyArchiveScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  // Main container: dark background
-  container: {
-    flex: 1,
-    backgroundColor: '#121212', // or #000
-    paddingTop: 40, // for status bar spacing if needed
-  },
   logoHeader: {
-    paddingTop: 70,  // key for spacing under translucent status bar
+    paddingTop: 70,
     paddingHorizontal: 20,
     paddingBottom: 10,
     flexDirection: 'row',
@@ -229,39 +196,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: 'Lato',
   },
-  // Header area (where "GEM" sits)
-  header: {
-    height: 60,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    backgroundColor: '#1E1E1E', 
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  // "Archived Gems" text
   archivedTitle: {
     fontSize: 20,
     color: '#FFFFFF',
     marginVertical: 16,
     marginHorizontal: 16,
-    fontWeight: '600',
+    fontFamily: 'Righteous',
   },
-  // The list container
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  // Each item row
   itemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    borderRadius: 8,
+    backgroundColor: '#181820',
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 15,
   },
   poster: {
     width: 60,
@@ -294,7 +245,12 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 8,
   },
-  // Loading / error / empty states
+  trashAction: {
+    backgroundColor: '#C62828',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 60,
+  },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
